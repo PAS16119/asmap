@@ -1,11 +1,11 @@
-import os
+﻿import os
 from flask import Flask
 from flask_jwt_extended import JWTManager
 from flask_cors import CORS
 from models import db, User, Subject, SchoolSettings
 from config import config
 
-# Complete subject list — Oguaa SHS Technical School 2025/26
+# Complete subject list â€” Oguaa SHS Technical School 2025/26
 DEFAULT_SUBJECTS = [
     "ENGLISH LANG",
     "GENERAL MATHS",
@@ -65,7 +65,7 @@ def create_app(env=None):
     JWTManager(app)
     CORS(app, resources={r"/api/*": {"origins": "*"}})
 
-    # ── Blueprints ────────────────────────────────────────────────────────────
+    # â”€â”€ Blueprints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     from routes.auth import auth_bp
     from routes.admin import admin_bp
     from routes.coordinator import coordinator_bp
@@ -76,11 +76,11 @@ def create_app(env=None):
     app.register_blueprint(coordinator_bp,  url_prefix='/api/coordinator')
     app.register_blueprint(supervisor_bp,   url_prefix='/api/supervisor')
 
-    # ── CLI: flask init-db ────────────────────────────────────────────────────
+    # â”€â”€ CLI: flask init-db â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     @app.cli.command('init-db')
     def init_db():
         db.create_all()
-        print('✓ Tables created')
+        print('âœ“ Tables created')
 
         # Default admin
         if not User.query.filter_by(role='admin').first():
@@ -92,15 +92,15 @@ def create_app(env=None):
             )
             admin.set_password('Admin@1234')
             db.session.add(admin)
-            print('✓ Default admin → username: admin | password: Admin@1234')
+            print('âœ“ Default admin â†’ username: admin | password: Admin@1234')
 
         # Seed subjects
         added = 0
         for name in DEFAULT_SUBJECTS:
-            if not Subject.query.filter_by(subject_name=name).first():
+            if not Subject.query.filter_by(name=name).first():
                 db.session.add(Subject(subject_name=name))
                 added += 1
-        print(f'✓ Subjects: {added} new, {len(DEFAULT_SUBJECTS) - added} already existed')
+        print(f'âœ“ Subjects: {added} new, {len(DEFAULT_SUBJECTS) - added} already existed')
 
         # Default school settings
         if not SchoolSettings.query.first():
@@ -111,13 +111,13 @@ def create_app(env=None):
                 normal_start='07:30',
                 extended_start='15:30',
             ))
-            print('✓ Default school settings created')
+            print('âœ“ Default school settings created')
 
         db.session.commit()
-        print('\n✅ ASMaP database initialized successfully')
-        print('   ⚠  Change the admin password after first login!\n')
+        print('\nâœ… ASMaP database initialized successfully')
+        print('   âš   Change the admin password after first login!\n')
 
-    # ── CLI: flask migrate-v11 ────────────────────────────────────────────────
+    # â”€â”€ CLI: flask migrate-v11 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     @app.cli.command('migrate-v11')
     def migrate_v11():
         """Safe migration v1.1: adds teacher_subjects table + period column."""
@@ -134,7 +134,7 @@ def create_app(env=None):
                     FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE
                 )
             """))
-            print("✓ teacher_subjects table ready")
+            print("âœ“ teacher_subjects table ready")
 
             try:
                 conn.execute(sa.text("""
@@ -143,24 +143,24 @@ def create_app(env=None):
                     WHERE subject_id IS NOT NULL
                     ON CONFLICT DO NOTHING
                 """))
-                print("✓ Existing teacher-subject links migrated")
+                print("âœ“ Existing teacher-subject links migrated")
             except Exception as e:
-                print(f"⚠ Could not seed teacher_subjects: {e}")
+                print(f"âš  Could not seed teacher_subjects: {e}")
 
             try:
                 conn.execute(sa.text(
                     "ALTER TABLE monitoring_records ADD COLUMN period VARCHAR(60)"
                 ))
-                print("✓ Added 'period' column to monitoring_records")
+                print("âœ“ Added 'period' column to monitoring_records")
             except Exception:
-                print("✓ 'period' column already exists — skipped")
+                print("âœ“ 'period' column already exists â€” skipped")
 
             conn.commit()
 
-        print("\n✅ Migration v1.1 complete!")
+        print("\nâœ… Migration v1.1 complete!")
         print("   No existing data was changed or deleted.")
 
-    # ── Health check ──────────────────────────────────────────────────────────
+    # â”€â”€ Health check â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     @app.route('/api/health')
     def health():
         return {'status': 'ok', 'system': 'ASMaP', 'version': '1.1'}
@@ -168,9 +168,10 @@ def create_app(env=None):
     return app
 
 
-# ── Standalone run ────────────────────────────────────────────────────────────
+# â”€â”€ Standalone run â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 if __name__ == '__main__':
     app = create_app()
     with app.app_context():
         db.create_all()
     app.run(debug=True, port=5000)
+
