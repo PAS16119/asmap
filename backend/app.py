@@ -98,7 +98,7 @@ def create_app(env=None):
         added = 0
         for name in DEFAULT_SUBJECTS:
             if not Subject.query.filter_by(name=name).first():
-                db.session.add(Subject(subject_name=name))
+                db.session.add(Subject(name=name))
                 added += 1
         print(f'âœ“ Subjects: {added} new, {len(DEFAULT_SUBJECTS) - added} already existed')
 
@@ -174,4 +174,5 @@ if __name__ == '__main__':
     with app.app_context():
         db.create_all()
     app.run(debug=True, port=5000)
+
 
