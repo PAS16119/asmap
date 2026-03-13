@@ -774,3 +774,238 @@ def teacher_evaluation_report():
 
     result.sort(key=lambda x: x['total'], reverse=True)
     return jsonify(result)
+# ════════════════════════════════════════════════════════════════════════════
+# PASTE THESE ROUTES INTO YOUR EXISTING routes/admin.py
+# Place them AFTER the existing /teachers GET/POST route
+# ════════════════════════════════════════════════════════════════════════════
+
+# ── GET /admin/teachers/template  — download blank Excel template ────────────
+@admin_bp.route('/teachers/template', methods=['GET'])
+@jwt_required()
+def teacher_template():
+    claims = get_jwt()
+    if claims.get('role') != 'admin':
+        return jsonify({'error': 'Admin only'}), 403
+
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+    from io import BytesIO
+    from flask import send_file
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Teachers'
+
+    # Header row
+    headers = ['Full Name', 'Staff ID (optional)', 'Primary Subject']
+    for col, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=h)
+        cell.font = Font(bold=True, color='FFFFFF')
+        cell.fill = PatternFill('solid', fgColor='1a3a5c')
+        cell.alignment = Alignment(horizontal='center')
+
+    # Example rows
+    examples = [
+        ['Mr. Kweku Asante', 'STF001', 'GENERAL MATHS'],
+        ['Mrs. Ama Boateng', 'STF002', 'ENGLISH LANG'],
+        ['Mr. Kofi Mensah',  'STF003', 'BIOLOGY'],
+    ]
+    for r, row in enumerate(examples, 2):
+        for c, val in enumerate(row, 1):
+            ws.cell(row=r, column=c, value=val)
+
+    # Column widths
+    ws.column_dimensions['A'].width = 30
+    ws.column_dimensions['B'].width = 20
+    ws.column_dimensions['C'].width = 25
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return send_file(buf, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                     as_attachment=True, download_name='teachers_template.xlsx')
+
+
+# ── POST /admin/teachers/import  — bulk import from Excel ───────────────────
+@admin_bp.route('/teachers/import', methods=['POST'])
+@jwt_required()
+def import_teachers():
+    claims = get_jwt()
+    if claims.get('role') != 'admin':
+        return jsonify({'error': 'Admin only'}), 403
+
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file uploaded'}), 400
+
+    file = request.files['file']
+    if not file.filename.endswith(('.xlsx', '.xls')):
+        return jsonify({'error': 'Please upload an Excel file (.xlsx or .xls)'}), 400
+
+    from openpyxl import load_workbook
+    from io import BytesIO
+
+    try:
+        wb = load_workbook(BytesIO(file.read()), data_only=True)
+        ws = wb.active
+    except Exception as e:
+        return jsonify({'error': f'Could not read Excel file: {str(e)}'}), 400
+
+    created = 0
+    skipped = 0
+    errors  = []
+
+    for row_num, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+        if not any(row):
+            continue  # skip blank rows
+
+        # Read columns: Full Name | Staff ID | Primary Subject
+        full_name   = str(row[0]).strip() if row[0] else ''
+        staff_id    = str(row[1]).strip() if len(row) > 1 and row[1] else ''
+        subject_str = str(row[2]).strip().upper() if len(row) > 2 and row[2] else ''
+
+        if not full_name:
+            errors.append(f'Row {row_num}: Name is empty — skipped')
+            skipped += 1
+            continue
+
+        # Check duplicate by name
+        existing = Teacher.query.filter(
+            db.func.lower(Teacher.full_name) == full_name.lower()
+        ).first()
+        if existing:
+            skipped += 1
+            continue
+
+        # Match subject by name (case-insensitive)
+        subject = None
+        if subject_str:
+            subject = Subject.query.filter(
+                db.func.upper(Subject.name) == subject_str
+            ).first()
+
+        teacher = Teacher(
+            full_name  = full_name,
+            staff_id   = staff_id or None,
+            subject_id = subject.id if subject else None,
+        )
+        db.session.add(teacher)
+        created += 1
+
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Database error: {str(e)}'}), 500
+
+    return jsonify({
+        'message': f'Import complete: {created} added, {skipped} skipped',
+        'created': created,
+        'skipped': skipped,
+        'errors': errors,
+    })
+
+
+# ── GET /admin/teachers/export  — export all teachers to Excel ───────────────
+@admin_bp.route('/teachers/export', methods=['GET'])
+@jwt_required()
+def export_teachers():
+    claims = get_jwt()
+    if claims.get('role') != 'admin':
+        return jsonify({'error': 'Admin only'}), 403
+
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+    from io import BytesIO
+    from flask import send_file
+
+    teachers = Teacher.query.order_by(Teacher.full_name).all()
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Teachers'
+
+    headers = ['Full Name', 'Staff ID', 'Primary Subject', 'All Subjects', 'Active']
+    for col, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=h)
+        cell.font = Font(bold=True, color='FFFFFF')
+        cell.fill = PatternFill('solid', fgColor='1a3a5c')
+
+    for r, t in enumerate(teachers, 2):
+        all_subjects = ', '.join(s.name for s in t.subjects) if t.subjects else (t.subject.name if t.subject else '')
+        ws.cell(row=r, column=1, value=t.full_name)
+        ws.cell(row=r, column=2, value=t.staff_id or '')
+        ws.cell(row=r, column=3, value=t.subject.name if t.subject else '')
+        ws.cell(row=r, column=4, value=all_subjects)
+        ws.cell(row=r, column=5, value='Yes' if t.is_active else 'No')
+
+    for col in ['A', 'B', 'C', 'D', 'E']:
+        ws.column_dimensions[col].width = 25
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return send_file(buf, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                     as_attachment=True, download_name='teachers_export.xlsx')
+
+
+# ── POST /admin/classes/import  — bulk class creation ───────────────────────
+@admin_bp.route('/classes/import', methods=['POST'])
+@jwt_required()
+def import_classes():
+    """Accept a list of class names in JSON body: { "names": ["SHS1A", "SHS1B", ...] }"""
+    claims = get_jwt()
+    if claims.get('role') != 'admin':
+        return jsonify({'error': 'Admin only'}), 403
+
+    data = request.get_json(silent=True) or {}
+    names = data.get('names', [])
+    if not names:
+        return jsonify({'error': 'Provide a list of class names'}), 400
+
+    created = 0
+    skipped = 0
+    for name in names:
+        name = str(name).strip()
+        if not name:
+            continue
+        existing = Class.query.filter(db.func.lower(Class.name) == name.lower()).first()
+        if existing:
+            skipped += 1
+            continue
+        db.session.add(Class(name=name))
+        created += 1
+
+    db.session.commit()
+    return jsonify({'message': f'{created} classes created, {skipped} already existed',
+                    'created': created, 'skipped': skipped})
+
+
+# ── POST /admin/teachers/<id>/subjects  — assign multiple subjects to teacher ─
+@admin_bp.route('/teachers/<int:teacher_id>/subjects', methods=['POST'])
+@jwt_required()
+def set_teacher_subjects(teacher_id):
+    claims = get_jwt()
+    if claims.get('role') != 'admin':
+        return jsonify({'error': 'Admin only'}), 403
+
+    teacher = Teacher.query.get_or_404(teacher_id)
+    data = request.get_json(silent=True) or {}
+    subject_ids = data.get('subject_ids', [])
+
+    subjects = Subject.query.filter(Subject.id.in_(subject_ids)).all()
+    teacher.subjects = subjects
+    db.session.commit()
+    return jsonify({'message': 'Subjects updated', 'teacher': teacher.to_dict()})
+
+
+# ── GET /admin/teachers/<id>/subjects  — get teacher's subjects ──────────────
+@admin_bp.route('/teachers/<int:teacher_id>/subjects', methods=['GET'])
+@jwt_required()
+def get_teacher_subjects(teacher_id):
+    claims = get_jwt()
+    if claims.get('role') != 'admin':
+        return jsonify({'error': 'Admin only'}), 403
+
+    teacher = Teacher.query.get_or_404(teacher_id)
+    return jsonify({'subjects': [s.to_dict() for s in teacher.subjects]})
+

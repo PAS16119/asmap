@@ -132,3 +132,69 @@ if __name__ == '__main__':
     with app.app_context():
         db.create_all()
     app.run(debug=True, port=5000)
+"""
+ADD THIS TO YOUR EXISTING app.py
+---------------------------------
+Find your existing:
+    @app.cli.command('init-db')
+    def init_db():
+        ...
+
+And ADD THIS NEW COMMAND right after it:
+"""
+
+# ── PASTE THIS BLOCK INTO app.py after the init-db command ──────────────────
+
+@app.cli.command('migrate-v11')
+def migrate_v11():
+    """Safe migration v1.1: adds teacher_subjects table + period column."""
+    import sqlalchemy as sa
+    engine = db.engine
+
+    with engine.connect() as conn:
+        # 1. Create teacher_subjects table if it doesn't exist
+        conn.execute(sa.text("""
+            CREATE TABLE IF NOT EXISTS teacher_subjects (
+                teacher_id INTEGER NOT NULL,
+                subject_id INTEGER NOT NULL,
+                PRIMARY KEY (teacher_id, subject_id),
+                FOREIGN KEY (teacher_id) REFERENCES teachers(id) ON DELETE CASCADE,
+                FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE
+            )
+        """))
+        print("✓ teacher_subjects table ready")
+
+        # 2. Seed teacher_subjects from existing primary subject data
+        try:
+            conn.execute(sa.text("""
+                INSERT INTO teacher_subjects (teacher_id, subject_id)
+                SELECT id, subject_id FROM teachers
+                WHERE subject_id IS NOT NULL
+                ON CONFLICT DO NOTHING
+            """))
+            print("✓ Existing teacher-subject links migrated")
+        except Exception as e:
+            print(f"⚠ Could not seed teacher_subjects: {e}")
+
+        # 3. Add 'period' column to monitoring_records if missing
+        try:
+            conn.execute(sa.text(
+                "ALTER TABLE monitoring_records ADD COLUMN period VARCHAR(60)"
+            ))
+            print("✓ Added 'period' column to monitoring_records")
+        except Exception:
+            print("✓ 'period' column already exists — skipped")
+
+        conn.commit()
+
+    print("\n✅ Migration v1.1 complete!")
+    print("   No existing data was changed or deleted.")
+
+# ────────────────────────────────────────────────────────────────────────────
+# HOW TO RUN ON RENDER:
+#   Go to your Render dashboard → your backend service
+#   Click "Shell" tab → type:
+#       flask --app app migrate-v11
+#   Press Enter and watch for ✅ Migration v1.1 complete!
+# ────────────────────────────────────────────────────────────────────────────
+

@@ -8,7 +8,7 @@
    During local development it defaults to localhost:5000.
    Example production: 'https://asmap-api.onrender.com'
 ──────────────────────────────────────────────────────────────────── */
-const API_BASE = window.API_BASE || 'http://localhost:5000/api';
+const API_BASE = window.API_BASE || 'https://asmap-backend.onrender.com/api';
 
 /* ══════════════════════════════════════════════════════════════════
    AUTH
