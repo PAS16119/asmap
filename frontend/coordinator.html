@@ -226,5 +226,179 @@ async function showBreakdown(sid, name) {
   } catch(e) { Toast.error(e.message); }
 }
 </script>
+
+<!-- CHANGE PASSWORD MODAL -->
+<div id="changePwModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:9999; align-items:center; justify-content:center;">
+  <div style="background:#0d2137; border:1px solid #1e4d7b; border-radius:12px; padding:2rem; width:100%; max-width:420px; box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+    <h3 style="color:#c9a84c; margin:0 0 1.5rem; font-size:1.1rem;">&#128274; Change Password</h3>
+    <div id="changePwError" style="display:none; background:#ff4444; color:#fff; padding:.6rem 1rem; border-radius:6px; margin-bottom:1rem; font-size:.85rem;"></div>
+    <div id="changePwSuccess" style="display:none; background:#2ecc71; color:#fff; padding:.6rem 1rem; border-radius:6px; margin-bottom:1rem; font-size:.85rem;"></div>
+    <label style="display:block; color:#8bb8d4; font-size:.8rem; margin-bottom:.3rem;">Current Password</label>
+    <input id="cpCurrent" type="password" placeholder="Your current password" style="width:100%; padding:.7rem 1rem; background:#0a1929; border:1px solid #1e4d7b; border-radius:6px; color:#fff; margin-bottom:1rem; box-sizing:border-box;" />
+    <label style="display:block; color:#8bb8d4; font-size:.8rem; margin-bottom:.3rem;">New Password</label>
+    <input id="cpNew" type="password" placeholder="At least 6 characters" style="width:100%; padding:.7rem 1rem; background:#0a1929; border:1px solid #1e4d7b; border-radius:6px; color:#fff; margin-bottom:1rem; box-sizing:border-box;" />
+    <label style="display:block; color:#8bb8d4; font-size:.8rem; margin-bottom:.3rem;">Confirm New Password</label>
+    <input id="cpConfirm" type="password" placeholder="Repeat new password" style="width:100%; padding:.7rem 1rem; background:#0a1929; border:1px solid #1e4d7b; border-radius:6px; color:#fff; margin-bottom:1.5rem; box-sizing:border-box;" />
+    <div style="display:flex; gap:1rem;">
+      <button onclick="submitChangePw()" style="flex:1; padding:.75rem; background:#c9a84c; color:#0a1929; border:none; border-radius:6px; font-weight:700; cursor:pointer; font-size:.95rem;">Update Password</button>
+      <button onclick="closeChangePw()" style="flex:1; padding:.75rem; background:transparent; color:#8bb8d4; border:1px solid #1e4d7b; border-radius:6px; cursor:pointer;">Cancel</button>
+    </div>
+  </div>
+</div>
+<script>
+function openChangePw(){
+  document.getElementById('changePwModal').style.display='flex';
+  ['cpCurrent','cpNew','cpConfirm'].forEach(function(id){document.getElementById(id).value='';});
+  document.getElementById('changePwError').style.display='none';
+  document.getElementById('changePwSuccess').style.display='none';
+}
+function closeChangePw(){document.getElementById('changePwModal').style.display='none';}
+async function submitChangePw(){
+  var current=document.getElementById('cpCurrent').value.trim();
+  var newPw=document.getElementById('cpNew').value.trim();
+  var confirm=document.getElementById('cpConfirm').value.trim();
+  var errEl=document.getElementById('changePwError');
+  var okEl=document.getElementById('changePwSuccess');
+  errEl.style.display='none'; okEl.style.display='none';
+  if(!current||!newPw||!confirm){errEl.textContent='All fields are required.';errEl.style.display='block';return;}
+  if(newPw.length<6){errEl.textContent='New password must be at least 6 characters.';errEl.style.display='block';return;}
+  if(newPw!==confirm){errEl.textContent='New passwords do not match.';errEl.style.display='block';return;}
+  var token=localStorage.getItem('asmap_token');
+  if(!token){window.location.href='login.html';return;}
+  try{
+    var base=(typeof API_BASE!=='undefined')?API_BASE:'http://localhost:5000/api';
+    var res=await fetch(base+'/auth/change-password',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({current_password:current,new_password:newPw})});
+    var data=await res.json();
+    if(res.ok){
+      okEl.textContent='Password changed successfully!';okEl.style.display='block';
+      ['cpCurrent','cpNew','cpConfirm'].forEach(function(id){document.getElementById(id).value='';});
+    }else{errEl.textContent=data.error||'Failed to change password.';errEl.style.display='block';}
+  }catch(e){errEl.textContent='Network error. Please try again.';errEl.style.display='block';}
+}
+document.addEventListener('DOMContentLoaded',function(){
+    initCoordMonitoring();
+  var modal=document.getElementById('changePwModal');
+  if(modal){modal.addEventListener('click',function(e){if(e.target===this)closeChangePw();});}
+});
+</script>
+
+<!-- COORDINATOR MONITORING SECTION -->
+<div id="monitoringSection" class="section" style="display:none;">
+  <h2 class="section-title">&#9676; Record Class Monitoring</h2>
+  <div class="card" style="margin-bottom:1.5rem;">
+    <h3 style="color:#c9a84c; margin:0 0 1rem; font-size:.95rem;">New Monitoring Record</h3>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+      <div><label class="form-label">Date *</label><input type="date" id="monDate" class="form-input" /></div>
+      <div><label class="form-label">Session Type *</label>
+        <select id="monSession" class="form-input">
+          <option value="Normal">Normal (Day Class)</option>
+          <option value="Extended">Extended (Evening)</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Teacher *</label>
+        <input type="text" id="monTeacherSearch" class="form-input" placeholder="Type teacher name..." oninput="coordSearchTeacher(this.value)" autocomplete="off" />
+        <div id="coordTeacherDropdown"></div>
+        <input type="hidden" id="monTeacherId" />
+      </div>
+      <div><label class="form-label">Subject</label><select id="monSubject" class="form-input"><option value="">Select Subject</option></select></div>
+      <div><label class="form-label">Class</label><select id="monClass" class="form-input"><option value="">Select Class</option></select></div>
+      <div><label class="form-label">Period</label>
+        <select id="monPeriod" class="form-input">
+          <option value="">Select Period</option>
+          <option value="Period 1 (07:00-08:50)">Period 1 (07:00 - 08:50)</option>
+          <option value="Period 2 (09:00-09:50)">Period 2 (09:00 - 09:50)</option>
+          <option value="Period 3 (09:50-10:40)">Period 3 (09:50 - 10:40)</option>
+          <option value="Period 4 (10:40-11:30)">Period 4 (10:40 - 11:30)</option>
+          <option value="Period 5 (11:30-12:20)">Period 5 (11:30 - 12:20)</option>
+          <option value="Period 6 (12:20-13:10)">Period 6 (12:20 - 13:10)</option>
+          <option value="Period 7 (13:10-14:00)">Period 7 (13:10 - 14:00)</option>
+          <option value="Extended Session">Extended Session</option>
+        </select>
+      </div>
+      <div><label class="form-label">Teacher Arrived (HH:MM)</label><input type="time" id="monTimeIn" class="form-input" /></div>
+      <div><label class="form-label">Students Present</label><input type="number" id="monStudents" class="form-input" placeholder="0" min="0" /></div>
+    </div>
+    <div style="margin-top:1rem;"><label class="form-label">Notes (optional)</label><textarea id="monNotes" class="form-input" rows="2"></textarea></div>
+    <button onclick="coordSubmitMonitoring()" style="margin-top:1rem; padding:.7rem 1.5rem; background:#c9a84c; color:#0a1929; border:none; border-radius:6px; font-weight:700; cursor:pointer;">Save Record</button>
+  </div>
+  <div class="card">
+    <h3 style="color:#c9a84c; margin:0 0 1rem; font-size:.95rem;">My Monitoring Records</h3>
+    <div id="coordMonitoringList" style="color:#8bb8d4;">Loading...</div>
+  </div>
+</div>
+<div id="teacherSummarySection" class="section" style="display:none;">
+  <h2 class="section-title">&#9681; Teacher Summary</h2>
+  <button onclick="loadCoordTeacherSummary()" style="margin-bottom:1rem; padding:.6rem 1.2rem; background:#1e4d7b; color:#fff; border:none; border-radius:6px; cursor:pointer;">Refresh</button>
+  <div id="coordTeacherSummaryTable" style="color:#8bb8d4;">Loading...</div>
+</div>
+<script>
+var coordAllTeachers=[];
+function initCoordMonitoring(){
+  var token=localStorage.getItem('asmap_token');if(!token)return;
+  var base=(typeof API_BASE!=='undefined')?API_BASE:'http://localhost:5000/api';
+  var h={'Authorization':'Bearer '+token};
+  var d=document.getElementById('monDate');if(d)d.value=new Date().toISOString().split('T')[0];
+  fetch(base+'/admin/subjects',{headers:h}).then(function(r){return r.json();}).then(function(d){
+    var sel=document.getElementById('monSubject');if(!sel)return;
+    (d.subjects||[]).forEach(function(s){var o=document.createElement('option');o.value=s.id;o.textContent=s.name;sel.appendChild(o);});
+  }).catch(function(){});
+  fetch(base+'/admin/classes',{headers:h}).then(function(r){return r.json();}).then(function(d){
+    var sel=document.getElementById('monClass');if(!sel)return;
+    (d.classes||[]).forEach(function(c){var o=document.createElement('option');o.value=c.id;o.textContent=c.name;sel.appendChild(o);});
+  }).catch(function(){});
+  fetch(base+'/admin/teachers',{headers:h}).then(function(r){return r.json();}).then(function(d){coordAllTeachers=d.teachers||[];}).catch(function(){});
+  loadCoordMonitoringRecords();
+}
+function coordSearchTeacher(query){
+  var dd=document.getElementById('coordTeacherDropdown');
+  if(!query||query.length<2){dd.innerHTML='';return;}
+  var matches=coordAllTeachers.filter(function(t){return t.full_name.toLowerCase().indexOf(query.toLowerCase())>=0;}).slice(0,8);
+  dd.style.cssText='position:relative;z-index:200;background:#0d2137;border:1px solid #1e4d7b;border-radius:4px;';
+  dd.innerHTML=matches.length?matches.map(function(t){return '<div onclick="coordSelectTeacher('+t.id+',this.dataset.name)" data-name="'+t.full_name.replace(/"/g,'&quot;')+'" style="padding:.5rem .75rem;cursor:pointer;color:#e8f4f8;font-size:.85rem;" onmouseover="this.style.background=\'#1e4d7b\'" onmouseout="this.style.background=\'\'">'+t.full_name+'</div>';}).join(''):'<div style="padding:.5rem .75rem;color:#8bb8d4;font-size:.85rem;">No match</div>';
+}
+function coordSelectTeacher(id,name){
+  document.getElementById('monTeacherId').value=id;
+  document.getElementById('monTeacherSearch').value=name;
+  document.getElementById('coordTeacherDropdown').innerHTML='';
+}
+async function coordSubmitMonitoring(){
+  var base=(typeof API_BASE!=='undefined')?API_BASE:'http://localhost:5000/api';
+  var token=localStorage.getItem('asmap_token');
+  var teacherId=document.getElementById('monTeacherId').value;
+  if(!teacherId){alert('Please select a teacher.');return;}
+  var date=document.getElementById('monDate').value;
+  if(!date){alert('Please select a date.');return;}
+  var body={teacher_id:parseInt(teacherId),subject_id:document.getElementById('monSubject').value||null,class_id:document.getElementById('monClass').value||null,attendance_date:date,session_type:document.getElementById('monSession').value,period:document.getElementById('monPeriod').value||null,time_in:document.getElementById('monTimeIn').value||null,students_present:parseInt(document.getElementById('monStudents').value)||0,notes:document.getElementById('monNotes').value};
+  try{
+    var r=await fetch(base+'/coordinator/monitoring',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify(body)});
+    var d=await r.json();
+    if(r.ok){alert('Saved!');document.getElementById('monTeacherSearch').value='';document.getElementById('monTeacherId').value='';loadCoordMonitoringRecords();}
+    else{alert('Error: '+(d.error||'Unknown'));}
+  }catch(e){alert('Network error.');}
+}
+async function loadCoordMonitoringRecords(){
+  var base=(typeof API_BASE!=='undefined')?API_BASE:'http://localhost:5000/api';
+  var token=localStorage.getItem('asmap_token');
+  var el=document.getElementById('coordMonitoringList');if(!el)return;
+  try{
+    var r=await fetch(base+'/coordinator/monitoring',{headers:{'Authorization':'Bearer '+token}});
+    var d=await r.json();var recs=d.records||[];
+    if(!recs.length){el.innerHTML='<p>No records yet.</p>';return;}
+    el.innerHTML='<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:.82rem;"><thead><tr style="color:#c9a84c;border-bottom:1px solid #1e4d7b;"><th style="padding:.5rem;text-align:left;">Date</th><th style="padding:.5rem;text-align:left;">Teacher</th><th style="padding:.5rem;text-align:left;">Period</th><th style="padding:.5rem;text-align:left;">Session</th><th style="padding:.5rem;text-align:left;">Arrived</th><th style="padding:.5rem;text-align:left;">Status</th></tr></thead><tbody>'+recs.map(function(r){return'<tr style="border-bottom:1px solid #0d2137;color:#e8f4f8;"><td style="padding:.5rem;">'+r.attendance_date+'</td><td style="padding:.5rem;">'+(r.teacher_name||'-')+'</td><td style="padding:.5rem;">'+(r.period||'-')+'</td><td style="padding:.5rem;">'+r.session_type+'</td><td style="padding:.5rem;">'+(r.time_in||'-')+'</td><td style="padding:.5rem;">'+(r.is_on_time===true?'<span style="color:#2ecc71;">On Time</span>':r.is_on_time===false?'<span style="color:#ff4444;">Late</span>':'-')+'</td></tr>';}).join('')+'</tbody></table></div>';
+  }catch(e){el.innerHTML='<p style="color:#ff4444;">Could not load records.</p>';}
+}
+async function loadCoordTeacherSummary(){
+  var base=(typeof API_BASE!=='undefined')?API_BASE:'http://localhost:5000/api';
+  var token=localStorage.getItem('asmap_token');
+  var el=document.getElementById('coordTeacherSummaryTable');if(!el)return;
+  try{
+    var r=await fetch(base+'/coordinator/teacher-summary',{headers:{'Authorization':'Bearer '+token}});
+    var d=await r.json();var rows=d.summary||[];
+    if(!rows.length){el.innerHTML='<p>No data yet.</p>';return;}
+    el.innerHTML='<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:.82rem;"><thead><tr style="color:#c9a84c;border-bottom:1px solid #1e4d7b;"><th style="padding:.5rem;text-align:left;">Teacher</th><th style="padding:.5rem;text-align:center;">Normal</th><th style="padding:.5rem;text-align:center;">On Time</th><th style="padding:.5rem;text-align:center;">Late</th><th style="padding:.5rem;text-align:center;">Extended</th><th style="padding:.5rem;text-align:center;">On Time</th><th style="padding:.5rem;text-align:center;">Late</th><th style="padding:.5rem;text-align:center;">Total</th></tr></thead><tbody>'+rows.map(function(r){return'<tr style="border-bottom:1px solid #0d2137;color:#e8f4f8;"><td style="padding:.5rem;">'+r.teacher_name+'</td><td style="padding:.5rem;text-align:center;">'+r.normal_total+'</td><td style="padding:.5rem;text-align:center;color:#2ecc71;">'+r.normal_ontime+'</td><td style="padding:.5rem;text-align:center;color:#ff4444;">'+r.normal_late+'</td><td style="padding:.5rem;text-align:center;">'+r.extended_total+'</td><td style="padding:.5rem;text-align:center;color:#2ecc71;">'+r.extended_ontime+'</td><td style="padding:.5rem;text-align:center;color:#ff4444;">'+r.extended_late+'</td><td style="padding:.5rem;text-align:center;font-weight:700;">'+r.grand_total+'</td></tr>';}).join('')+'</tbody></table></div>';
+  }catch(e){el.innerHTML='<p style="color:#ff4444;">Could not load.</p>';}
+}
+</script>
 </body>
 </html>
