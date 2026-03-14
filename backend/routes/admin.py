@@ -223,7 +223,6 @@ def create_user():
         email=(data.get('email') or '').strip() or None,
         role=data['role'],
         full_name=(data.get('full_name') or '').strip() or None,
-        created_by=get_jwt_identity()
     )
     u.set_password(data['password'])
     db.session.add(u)
@@ -266,8 +265,7 @@ def create_teacher():
         return jsonify({'error': 'Teacher name required'}), 400
     t = Teacher(
         full_name=name,
-        subject=(data.get('subject') or '').strip() or None,
-        created_by=get_jwt_identity()
+        subject_id=None,
     )
     db.session.add(t)
     db.session.commit()
@@ -1008,6 +1006,7 @@ def get_teacher_subjects(teacher_id):
 
     teacher = Teacher.query.get_or_404(teacher_id)
     return jsonify({'subjects': [s.to_dict() for s in teacher.subjects]})
+
 
 
 
