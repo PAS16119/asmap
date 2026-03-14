@@ -272,7 +272,7 @@ async function submitChangePw(){
   try{
     var base=(typeof API_BASE!=='undefined')?API_BASE:'http://localhost:5000/api';
     var res=await fetch(base+'/auth/change-password',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({current_password:current,new_password:newPw})});
-    var data=await res.json();
+    var _sd=await res.json();
     if(res.ok){
       okEl.textContent='Password changed successfully!';okEl.style.display='block';
       ['cpCurrent','cpNew','cpConfirm'].forEach(function(id){document.getElementById(id).value='';});
@@ -406,5 +406,6 @@ async function loadCoordTeacherSummary(){
 </script>
 </body>
 </html>
+
 
 
