@@ -134,7 +134,7 @@ def create_year():
         return jsonify({'error': 'Year label required (e.g. 2025/2026)'}), 400
     if AcademicYear.query.filter_by(label=label).first():
         return jsonify({'error': 'Year already exists'}), 409
-    y = AcademicYear(label=label, created_by=get_jwt_identity())
+    y = AcademicYear(label=label)
     db.session.add(y)
     db.session.commit()
     return jsonify(y.to_dict()), 201
@@ -160,19 +160,19 @@ def dashboard():
     s_query = Student.query.filter_by(is_active=True)
     m_query = MonitoringRecord.query
     if year_id:
-        p_query = p_query.filter_by(academic_year_id=year_id)
-        s_query = s_query.filter_by(academic_year_id=year_id)
-        m_query = m_query.filter_by(academic_year_id=year_id)
+        p_query = p_query.filter_by(year_id=year_id)
+        s_query = s_query.filter_by(year_id=year_id)
+        m_query = m_query.filter_by(year_id=year_id)
 
     total_collected = db.session.query(func.sum(Payment.amount))
     if year_id:
-        total_collected = total_collected.filter(Payment.academic_year_id == year_id)
+        total_collected = total_collected.filter(Payment.student.has(year_id=year_id) == year_id)
     total_collected = float(total_collected.scalar() or 0)
 
     # Purpose breakdown
     pq = db.session.query(Payment.purpose, func.sum(Payment.amount).label('t'), func.count(Payment.id).label('c'))
     if year_id:
-        pq = pq.filter(Payment.academic_year_id == year_id)
+        pq = pq.filter(Payment.student.has(year_id=year_id) == year_id)
     purpose_rows = pq.group_by(Payment.purpose).all()
 
     # Class breakdown
@@ -180,7 +180,7 @@ def dashboard():
           .join(Student, Student.id == Payment.student_id)
           .join(Class, Class.id == Student.class_id))
     if year_id:
-        cq = cq.filter(Payment.academic_year_id == year_id)
+        cq = cq.filter(Payment.student.has(year_id=year_id) == year_id)
     class_rows = cq.group_by(Class.name).order_by(Class.name).all()
 
     return jsonify({
@@ -311,7 +311,7 @@ def create_subject():
         return jsonify({'error': 'Subject name required'}), 400
     if Subject.query.filter_by(name=name).first():
         return jsonify({'error': 'Subject already exists'}), 409
-    s = Subject(name=name, created_by=get_jwt_identity())
+    s = Subject(name=name)
     db.session.add(s)
     db.session.commit()
     return jsonify(s.to_dict()), 201
@@ -342,7 +342,7 @@ def create_class():
         return jsonify({'error': 'Class name required'}), 400
     if Class.query.filter_by(name=name).first():
         return jsonify({'error': 'Class already exists'}), 409
-    c = Class(name=name, created_by=get_jwt_identity())
+    c = Class(name=name)
     db.session.add(c)
     db.session.commit()
     return jsonify(c.to_dict()), 201
@@ -364,7 +364,7 @@ def list_students():
     year_id  = request.args.get('year_id') or _active_year_id()
     class_id = request.args.get('class_id')
     q = Student.query.filter_by(is_active=True)
-    if year_id:  q = q.filter_by(academic_year_id=int(year_id))
+    if year_id:  q = q.filter_by(year_id=int(year_id))
     if class_id: q = q.filter_by(class_id=int(class_id))
     return jsonify([s.to_dict() for s in q.order_by(Student.student_name).all()])
 
@@ -378,8 +378,8 @@ def create_student():
     if not name or not class_id:
         return jsonify({'error': 'Student name and class are required'}), 400
     year_id = data.get('academic_year_id') or _active_year_id()
-    s = Student(student_name=name, class_id=int(class_id),
-                academic_year_id=year_id, created_by=get_jwt_identity())
+    s = Student(name=name, class_id=int(class_id),
+                year_id=year_id)
     db.session.add(s)
     db.session.commit()
     return jsonify(s.to_dict()), 201
@@ -423,16 +423,16 @@ def import_students():
 
         cls = Class.query.filter_by(name=cname).first()
         if not cls:
-            cls = Class(name=cname, created_by=creator_id)
+            cls = Class(name=cname)
             db.session.add(cls)
             db.session.flush()
 
-        if Student.query.filter_by(student_name=sname, class_id=cls.id, academic_year_id=year_id).first():
+        if Student.query.filter_by(name=sname, class_id=cls.id, year_id=year_id).first():
             skipped += 1
             continue
 
-        db.session.add(Student(student_name=sname, class_id=cls.id,
-                               academic_year_id=year_id, created_by=creator_id))
+        db.session.add(Student(name=sname, class_id=cls.id,
+                               year_id=year_id))
         created += 1
 
     db.session.commit()
@@ -469,10 +469,10 @@ def export_students():
     for c in ws[1]: c.font = hfont; c.fill = hfill
 
     q = Student.query.filter_by(is_active=True)
-    if year_id: q = q.filter_by(academic_year_id=int(year_id))
+    if year_id: q = q.filter_by(year_id=int(year_id))
     for s in q.order_by(Student.student_name).all():
         ws.append([s.name, s.class_.name if s.class_ else '',
-                   s.academic_year.label if s.academic_year else ''])
+                   s.year.label if s.year else "" if s.academic_year else ''])
 
     for col, w in [('A', 35), ('B', 20), ('C', 15)]:
         ws.column_dimensions[col].width = w
@@ -525,7 +525,7 @@ def list_payments():
     confirmed = request.args.get('confirmed')
 
     q = Payment.query
-    if year_id:   q = q.filter_by(academic_year_id=int(year_id))
+    if year_id:   q = q.filter_by(year_id=int(year_id))
     if class_id:  q = q.join(Student).filter(Student.class_id == int(class_id))
     if student_id:q = q.filter(Payment.student_id == int(student_id))
     if confirmed is not None and confirmed != '':
@@ -550,7 +550,7 @@ def record_payment():
         purpose=data['purpose'],
         notes=data.get('notes'),
         collected_by_user_id=uid,
-        academic_year_id=year_id,
+        year_id=year_id,
         is_confirmed=True,
         confirmed_by_admin_id=uid
     )
@@ -597,7 +597,7 @@ def delete_payment(pid):
 def student_payment_breakdown(student_id):
     year_id = request.args.get('year_id') or _active_year_id()
     q = Payment.query.filter_by(student_id=student_id)
-    if year_id: q = q.filter_by(academic_year_id=int(year_id))
+    if year_id: q = q.filter_by(year_id=int(year_id))
     payments = q.order_by(Payment.created_at.desc()).all()
     total = sum(float(p.amount) for p in payments)
     return jsonify({'total': total, 'payment_count': len(payments),
@@ -611,7 +611,7 @@ def payment_reports():
     year_id = request.args.get('year_id') or _active_year_id()
 
     def filtered(q):
-        return q.filter(Payment.academic_year_id == year_id) if year_id else q
+        return q.filter(Payment.student.has(year_id=year_id) == year_id) if year_id else q
 
     by_class = (db.session.query(Class.id.label('cid'), Class.name,
                                   func.sum(Payment.amount).label('t'),
@@ -659,7 +659,7 @@ def export_payment_report():
     ws1.append(['Student', 'Class', 'Purpose', 'Amount (GHS)', 'Collected By', 'Confirmed', 'Date'])
     hrow(ws1)
     q = Payment.query
-    if year_id: q = q.filter_by(academic_year_id=int(year_id))
+    if year_id: q = q.filter_by(year_id=int(year_id))
     for p in q.order_by(Payment.created_at.desc()).all():
         ws1.append([
             p.student.student_name if p.student else '',
@@ -678,7 +678,7 @@ def export_payment_report():
     by_class = (db.session.query(Class.name, func.sum(Payment.amount), func.count(Payment.id))
                 .join(Student, Student.id == Payment.student_id)
                 .join(Class, Class.id == Student.class_id))
-    if year_id: by_class = by_class.filter(Payment.academic_year_id == int(year_id))
+    if year_id: by_class = by_class.filter(Payment.student.has(year_id=year_id) == int(year_id))
     for r in by_class.group_by(Class.name).order_by(Class.name).all():
         ws2.append([r[0], float(r[1]), r[2]])
     for col, w in [('A',24),('B',20),('C',16)]: ws2.column_dimensions[col].width = w
@@ -687,7 +687,7 @@ def export_payment_report():
     ws3.append(['Purpose', 'Total (GHS)', 'Transactions'])
     hrow(ws3)
     by_p = db.session.query(Payment.purpose, func.sum(Payment.amount), func.count(Payment.id))
-    if year_id: by_p = by_p.filter(Payment.academic_year_id == int(year_id))
+    if year_id: by_p = by_p.filter(Payment.student.has(year_id=year_id) == int(year_id))
     for r in by_p.group_by(Payment.purpose).all():
         ws3.append([r[0], float(r[1]), r[2]])
     for col, w in [('A',28),('B',20),('C',16)]: ws3.column_dimensions[col].width = w
@@ -710,7 +710,7 @@ def list_monitoring():
     session_t  = request.args.get('session_type')
 
     q = MonitoringRecord.query
-    if year_id:    q = q.filter_by(academic_year_id=int(year_id))
+    if year_id:    q = q.filter_by(year_id=int(year_id))
     if class_id:   q = q.filter_by(class_id=int(class_id))
     if teacher_id: q = q.filter_by(teacher_id=int(teacher_id))
     if session_t:  q = q.filter_by(session_type=session_t)
@@ -748,7 +748,7 @@ def teacher_evaluation_report():
 
     def stats(teacher_id, session_type):
         q = MonitoringRecord.query.filter_by(teacher_id=teacher_id, session_type=session_type)
-        if year_id: q = q.filter_by(academic_year_id=int(year_id))
+        if year_id: q = q.filter_by(year_id=int(year_id))
         recs = q.all()
         total     = len(recs)
         on_time   = sum(1 for r in recs if r.is_on_time is True)
@@ -1008,6 +1008,7 @@ def get_teacher_subjects(teacher_id):
 
     teacher = Teacher.query.get_or_404(teacher_id)
     return jsonify({'subjects': [s.to_dict() for s in teacher.subjects]})
+
 
 
 
