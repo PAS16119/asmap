@@ -609,25 +609,33 @@ def payment_reports():
     year_id = request.args.get('year_id') or _active_year_id()
 
     def filtered(q):
-        return q.filter(Student.year_id == year_id) if year_id else q
+        if not year_id:
+            return q
+        return q.join(Student, Student.id == Payment.student_id).filter(Student.year_id == year_id)
 
     by_class = (db.session.query(Class.id.label('cid'), Class.name,
                                   func.sum(Payment.amount).label('t'),
                                   func.count(Payment.id).label('c'))
                 .join(Student, Student.id == Payment.student_id)
                 .join(Class, Class.id == Student.class_id))
-    by_class = filtered(by_class).group_by(Class.id, Class.name).order_by(Class.name).all()
+    if year_id:
+        by_class = by_class.filter(Student.year_id == year_id)
+    by_class = by_class.group_by(Class.id, Class.name).order_by(Class.name).all()
 
     by_purpose = db.session.query(Payment.purpose,
                                    func.sum(Payment.amount).label('t'),
                                    func.count(Payment.id).label('c'))
-    by_purpose = filtered(by_purpose).group_by(Payment.purpose).order_by(func.sum(Payment.amount).desc()).all()
+    if year_id:
+        by_purpose = by_purpose.join(Student, Student.id == Payment.student_id).filter(Student.year_id == year_id)
+    by_purpose = by_purpose.group_by(Payment.purpose).order_by(func.sum(Payment.amount).desc()).all()
 
     by_collector = (db.session.query(User.id, User.full_name, User.username,
                                       func.sum(Payment.amount).label('t'),
                                       func.count(Payment.id).label('c'))
                     .join(User, User.id == Payment.collected_by_user_id))
-    by_collector = filtered(by_collector).group_by(User.id).order_by(func.sum(Payment.amount).desc()).all()
+    if year_id:
+        by_collector = by_collector.join(Student, Student.id == Payment.student_id).filter(Student.year_id == year_id)
+    by_collector = by_collector.group_by(User.id).order_by(func.sum(Payment.amount).desc()).all()
 
     grand = sum(float(r.t) for r in by_class)
 
