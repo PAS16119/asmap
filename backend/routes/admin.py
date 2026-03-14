@@ -609,7 +609,7 @@ def payment_reports():
     year_id = request.args.get('year_id') or _active_year_id()
 
     def filtered(q):
-        return q.filter(Payment.student.has(year_id=year_id) == year_id) if year_id else q
+        return q.filter(Student.year_id == year_id) if year_id else q
 
     by_class = (db.session.query(Class.id.label('cid'), Class.name,
                                   func.sum(Payment.amount).label('t'),
