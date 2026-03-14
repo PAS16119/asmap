@@ -97,7 +97,55 @@
 </div>
 </div>
 
-<!-- BREAKDOWN MODAL -->
+<div id="section-monitoring" class="section-view">
+  <h2 class="section-title">&#9676; Record Class Monitoring</h2>
+  <div class="card" style="margin-bottom:1.5rem;">
+    <h3 style="color:#c9a84c; margin:0 0 1rem; font-size:.95rem;">New Monitoring Record</h3>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+      <div><label class="form-label">Date *</label><input type="date" id="monDate" class="form-input" /></div>
+      <div><label class="form-label">Session Type *</label>
+        <select id="monSession" class="form-input">
+          <option value="Normal">Normal (Day Class)</option>
+          <option value="Extended">Extended (Evening)</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Teacher *</label>
+        <input type="text" id="monTeacherSearch" class="form-input" placeholder="Type teacher name..." oninput="coordSearchTeacher(this.value)" autocomplete="off" />
+        <div id="coordTeacherDropdown"></div>
+        <input type="hidden" id="monTeacherId" />
+      </div>
+      <div><label class="form-label">Subject</label><select id="monSubject" class="form-input"><option value="">Select Subject</option></select></div>
+      <div><label class="form-label">Class</label><select id="monClass" class="form-input"><option value="">Select Class</option></select></div>
+      <div><label class="form-label">Period</label>
+        <select id="monPeriod" class="form-input">
+          <option value="">Select Period</option>
+          <option value="Period 1 (07:00-08:50)">Period 1 (07:00 - 08:50)</option>
+          <option value="Period 2 (09:00-09:50)">Period 2 (09:00 - 09:50)</option>
+          <option value="Period 3 (09:50-10:40)">Period 3 (09:50 - 10:40)</option>
+          <option value="Period 4 (10:40-11:30)">Period 4 (10:40 - 11:30)</option>
+          <option value="Period 5 (11:30-12:20)">Period 5 (11:30 - 12:20)</option>
+          <option value="Period 6 (12:20-13:10)">Period 6 (12:20 - 13:10)</option>
+          <option value="Period 7 (13:10-14:00)">Period 7 (13:10 - 14:00)</option>
+          <option value="Extended Session">Extended Session</option>
+        </select>
+      </div>
+      <div><label class="form-label">Teacher Arrived (HH:MM)</label><input type="time" id="monTimeIn" class="form-input" /></div>
+      <div><label class="form-label">Students Present</label><input type="number" id="monStudents" class="form-input" placeholder="0" min="0" /></div>
+    </div>
+    <div style="margin-top:1rem;"><label class="form-label">Notes (optional)</label><textarea id="monNotes" class="form-input" rows="2"></textarea></div>
+    <button onclick="coordSubmitMonitoring()" style="margin-top:1rem; padding:.7rem 1.5rem; background:#c9a84c; color:#0a1929; border:none; border-radius:6px; font-weight:700; cursor:pointer;">Save Record</button>
+  </div>
+  <div class="card">
+    <h3 style="color:#c9a84c; margin:0 0 1rem; font-size:.95rem;">My Monitoring Records</h3>
+    <div id="coordMonitoringList" style="color:#8bb8d4;">Loading...</div>
+  </div>
+</div>
+<div id="section-teacherSummary" class="section-view">
+  <h2 class="section-title">&#9681; Teacher Summary</h2>
+  <button onclick="loadCoordTeacherSummary()" style="margin-bottom:1rem; padding:.6rem 1.2rem; background:#1e4d7b; color:#fff; border:none; border-radius:6px; cursor:pointer;">Refresh</button>
+  <div id="coordTeacherSummaryTable" style="color:#8bb8d4;">Loading...</div>
+  <!-- BREAKDOWN MODAL -->
 <div id="modal-breakdown" class="modal-overlay">
   <div class="modal modal-lg"><div class="modal-header"><span class="modal-title" id="bd-title">Payment Breakdown</span><button class="modal-close" onclick="UI.closeModal('modal-breakdown')">✕</button></div>
   <div id="bd-body"></div>
@@ -289,54 +337,7 @@ document.addEventListener('DOMContentLoaded',function(){
 </script>
 
 <!-- COORDINATOR MONITORING SECTION -->
-<div id="section-monitoring" class="section-view">
-  <h2 class="section-title">&#9676; Record Class Monitoring</h2>
-  <div class="card" style="margin-bottom:1.5rem;">
-    <h3 style="color:#c9a84c; margin:0 0 1rem; font-size:.95rem;">New Monitoring Record</h3>
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
-      <div><label class="form-label">Date *</label><input type="date" id="monDate" class="form-input" /></div>
-      <div><label class="form-label">Session Type *</label>
-        <select id="monSession" class="form-input">
-          <option value="Normal">Normal (Day Class)</option>
-          <option value="Extended">Extended (Evening)</option>
-        </select>
-      </div>
-      <div>
-        <label class="form-label">Teacher *</label>
-        <input type="text" id="monTeacherSearch" class="form-input" placeholder="Type teacher name..." oninput="coordSearchTeacher(this.value)" autocomplete="off" />
-        <div id="coordTeacherDropdown"></div>
-        <input type="hidden" id="monTeacherId" />
-      </div>
-      <div><label class="form-label">Subject</label><select id="monSubject" class="form-input"><option value="">Select Subject</option></select></div>
-      <div><label class="form-label">Class</label><select id="monClass" class="form-input"><option value="">Select Class</option></select></div>
-      <div><label class="form-label">Period</label>
-        <select id="monPeriod" class="form-input">
-          <option value="">Select Period</option>
-          <option value="Period 1 (07:00-08:50)">Period 1 (07:00 - 08:50)</option>
-          <option value="Period 2 (09:00-09:50)">Period 2 (09:00 - 09:50)</option>
-          <option value="Period 3 (09:50-10:40)">Period 3 (09:50 - 10:40)</option>
-          <option value="Period 4 (10:40-11:30)">Period 4 (10:40 - 11:30)</option>
-          <option value="Period 5 (11:30-12:20)">Period 5 (11:30 - 12:20)</option>
-          <option value="Period 6 (12:20-13:10)">Period 6 (12:20 - 13:10)</option>
-          <option value="Period 7 (13:10-14:00)">Period 7 (13:10 - 14:00)</option>
-          <option value="Extended Session">Extended Session</option>
-        </select>
-      </div>
-      <div><label class="form-label">Teacher Arrived (HH:MM)</label><input type="time" id="monTimeIn" class="form-input" /></div>
-      <div><label class="form-label">Students Present</label><input type="number" id="monStudents" class="form-input" placeholder="0" min="0" /></div>
-    </div>
-    <div style="margin-top:1rem;"><label class="form-label">Notes (optional)</label><textarea id="monNotes" class="form-input" rows="2"></textarea></div>
-    <button onclick="coordSubmitMonitoring()" style="margin-top:1rem; padding:.7rem 1.5rem; background:#c9a84c; color:#0a1929; border:none; border-radius:6px; font-weight:700; cursor:pointer;">Save Record</button>
-  </div>
-  <div class="card">
-    <h3 style="color:#c9a84c; margin:0 0 1rem; font-size:.95rem;">My Monitoring Records</h3>
-    <div id="coordMonitoringList" style="color:#8bb8d4;">Loading...</div>
-  </div>
-</div>
-<div id="section-teacherSummary" class="section-view">
-  <h2 class="section-title">&#9681; Teacher Summary</h2>
-  <button onclick="loadCoordTeacherSummary()" style="margin-bottom:1rem; padding:.6rem 1.2rem; background:#1e4d7b; color:#fff; border:none; border-radius:6px; cursor:pointer;">Refresh</button>
-  <div id="coordTeacherSummaryTable" style="color:#8bb8d4;">Loading...</div>
+
 </div>
 <script>
 var coordAllTeachers=[];
@@ -408,9 +409,3 @@ async function loadCoordTeacherSummary(){
 </script>
 </body>
 </html>
-
-
-
-
-
-
