@@ -324,6 +324,45 @@ def delete_subject(sid):
     return jsonify({'message': 'Deleted'})
 
 
+# subjects/import - bulk import from Excel
+@admin_bp.route('/subjects/import', methods=['POST'])
+@jwt_required()
+def import_subjects():
+    claims = get_jwt()
+    if claims.get('role') != 'admin':
+        return jsonify({'error': 'Admin only'}), 403
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file uploaded'}), 400
+    file = request.files['file']
+    if not file.filename.endswith(('.xlsx', '.xls')):
+        return jsonify({'error': 'Please upload an Excel file (.xlsx or .xls)'}), 400
+    from openpyxl import load_workbook
+    from io import BytesIO
+    try:
+        wb = load_workbook(BytesIO(file.read()), data_only=True)
+        ws = wb.active
+    except Exception as e:
+        return jsonify({'error': f'Could not read Excel file: {str(e)}'}), 400
+    created = 0
+    skipped = 0
+    errors  = []
+    for row_num, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+        if not any(row):
+            continue
+        name = str(row[0]).strip().upper() if row[0] else ''
+        if not name:
+            errors.append(f'Row {row_num}: Empty - skipped')
+            skipped += 1
+            continue
+        if Subject.query.filter_by(name=name).first():
+            skipped += 1
+            continue
+        db.session.add(Subject(name=name))
+        created += 1
+    db.session.commit()
+    return jsonify({'created': created, 'skipped': skipped, 'errors': errors})
+
+
 # â”€â”€ CLASSES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @admin_bp.route('/classes', methods=['GET'])
 @jwt_required()

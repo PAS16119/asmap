@@ -193,7 +193,10 @@
     <div class="setup-grid">
       <div class="card"><div class="card-header"><span class="card-title">Teachers</span><button class="btn btn-primary btn-sm" onclick="UI.openModal('modal-teacher')">+ Add</button></div><div id="setup-teachers-list"></div></div>
       <div class="card"><div class="card-header"><span class="card-title">Classes</span><button class="btn btn-primary btn-sm" onclick="UI.openModal('modal-class')">+ Add</button></div><div id="setup-classes-list"></div></div>
-      <div class="card"><div class="card-header"><span class="card-title">Subjects <span style="font-size:.72rem;color:var(--text-3);font-weight:400">(pre-seeded — add more here)</span></span><button class="btn btn-primary btn-sm" onclick="UI.openModal('modal-subject')">+ Add</button></div><div id="setup-subjects-list"></div></div>
+      <div class="card"><div class="card-header"><span class="card-title">Subjects <span style="font-size:.72rem;color:var(--text-3);font-weight:400">(pre-seeded — add more here)</span></span><button class="btn btn-primary btn-sm" onclick="UI.openModal('modal-subject')">+ Add</button>
+          <label class="btn btn-ghost btn-sm" style="cursor:pointer;margin-left:6px" title="Import subjects from Excel file. One subject name per row starting row 2.">
+            Import Excel<input type="file" accept=".xlsx,.xls" style="display:none" onchange="importSubjects(this)">
+          </label></div><div id="setup-subjects-list"></div></div>
       <div class="card"><div class="card-header"><span class="card-title">Coordinator Assignments</span><button class="btn btn-primary btn-sm" onclick="UI.openModal('modal-assign')">+ Assign</button></div><div id="setup-assign-list"></div></div>
     </div>
   </div>
@@ -707,6 +710,21 @@ async function deletePeriod(id){
     Toast.success("Period deleted");
     delete sectionLoaded["setup"]; loadSetup();
   } catch(e){ Toast.error(e.message); }
+}
+
+
+async function importSubjects(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const fd = new FormData();
+  fd.append('file', file);
+  input.value = '';
+  try {
+    const data = await Api.upload('/admin/subjects/import', fd);
+    Toast.success('Done: ' + data.created + ' added, ' + data.skipped + ' skipped');
+    delete sectionLoaded['setup'];
+    loadSetup();
+  } catch(e) { Toast.error(e.message); }
 }
 
 async function loadLookupStudents() {
