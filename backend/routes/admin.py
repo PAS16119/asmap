@@ -44,7 +44,7 @@ def settings_public():
     s = SchoolSettings.query.first()
     if not s:
         return jsonify({'school_name': 'Your School', 'school_short': '', 'school_motto': '', 'school_logo': ''})
-    return jsonify(s.to_public_dict())
+    return jsonify(s.to_dict())
 
 
 @admin_bp.route('/settings', methods=['GET'])
@@ -1006,6 +1006,7 @@ def get_teacher_subjects(teacher_id):
 
     teacher = Teacher.query.get_or_404(teacher_id)
     return jsonify({'subjects': [s.to_dict() for s in teacher.subjects]})
+
 
 
 
