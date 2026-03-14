@@ -180,14 +180,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   loadOverview();
 });
 
-const go = makeNav(sectionLoaded, {
-  overview: loadOverview,
-  record:   loadRecordSection,
-  history:  loadHistorySection,
-monitoring: initCoordMonitoring,
-teacherSummary: loadCoordTeacherSummary,
-});
-
 async function loadOverview() {
   try {
     const _pr = await Api.get("/coordinator/payments"); const payments = _pr.payments || _pr;
