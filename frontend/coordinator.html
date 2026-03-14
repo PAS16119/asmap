@@ -132,7 +132,7 @@ const go = makeNav(sectionLoaded, {
 
 async function loadOverview() {
   try {
-    const payments = await Api.get("/coordinator/payments");
+    const _pr = await Api.get("/coordinator/payments"); const payments = _pr.payments || _pr;
     const total = payments.reduce((s,p) => s + p.amount, 0);
     const unconf = payments.filter(p => !p.is_confirmed).length;
     document.getElementById("coord-stats").innerHTML = `
@@ -406,4 +406,5 @@ async function loadCoordTeacherSummary(){
 </script>
 </body>
 </html>
+
 

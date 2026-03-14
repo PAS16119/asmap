@@ -156,7 +156,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 async function loadDashboard() {
   try {
-    const records = await Api.get("/supervisor/monitoring");
+    const _rr = await Api.get("/supervisor/monitoring"); const records = _rr.records || _rr;
     const tSet = new Set(records.map(r => r.teacher_id));
     const now = new Date(); const weekStart = new Date(now); weekStart.setDate(now.getDate()-now.getDay());
     const thisWeek = records.filter(r => new Date(r.attendance_date) >= weekStart).length;
@@ -328,3 +328,4 @@ document.addEventListener('DOMContentLoaded',function(){
 </script>
 </body>
 </html>
+
