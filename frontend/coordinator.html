@@ -177,6 +177,10 @@ function initCoordMonitoring(){
     var sel=document.getElementById('monSubject');if(!sel)return;
     (d.subjects||[]).forEach(function(s){var o=document.createElement('option');o.value=s.id;o.textContent=s.name;sel.appendChild(o);});
   }).catch(function(){});
+  fetch(base+'/admin/periods/active',{headers:h}).then(function(r){return r.json();}).then(function(d){
+    var sel=document.getElementById('monPeriod');if(!sel)return;
+    (d.periods||[]).forEach(function(p){var o=document.createElement('option');o.value=p.label;o.textContent=p.label;sel.appendChild(o);});
+  }).catch(function(){});
   fetch(base+'/admin/classes',{headers:h}).then(function(r){return r.json();}).then(function(d){
     var sel=document.getElementById('monClass');if(!sel)return;
     (d.classes||[]).forEach(function(c){var o=document.createElement('option');o.value=c.id;o.textContent=c.name;sel.appendChild(o);});
@@ -347,14 +351,6 @@ async function loadCoordTeacherSummary(){
       <div><label class="form-label">Period</label>
         <select id="monPeriod" class="form-input">
           <option value="">Select Period</option>
-          <option value="Period 1 (07:00-08:50)">Period 1 (07:00 - 08:50)</option>
-          <option value="Period 2 (09:00-09:50)">Period 2 (09:00 - 09:50)</option>
-          <option value="Period 3 (09:50-10:40)">Period 3 (09:50 - 10:40)</option>
-          <option value="Period 4 (10:40-11:30)">Period 4 (10:40 - 11:30)</option>
-          <option value="Period 5 (11:30-12:20)">Period 5 (11:30 - 12:20)</option>
-          <option value="Period 6 (12:20-13:10)">Period 6 (12:20 - 13:10)</option>
-          <option value="Period 7 (13:10-14:00)">Period 7 (13:10 - 14:00)</option>
-          <option value="Extended Teaching">Extended Teaching</option>
         </select>
       </div>
       <div><label class="form-label">Teacher Arrived (HH:MM)</label><input type="time" id="monTimeIn" class="form-input" /></div>

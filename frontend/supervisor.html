@@ -81,11 +81,7 @@
           </select>
         </div>
         <div class="form-group"><label class="form-label">Period</label>
-          <select class="form-select" id="rec-period">
-            <option value="">—</option><option value="1">Period 1</option><option value="2">Period 2</option>
-            <option value="3">Period 3</option><option value="4">Period 4</option><option value="5">Period 5</option>
-            <option value="6">Period 6</option><option value="7">Period 7</option><option value="8">Period 8</option>
-          </select>
+          <select class="form-select" id="rec-period"><option value="">Select Period</option></select>
         </div>
       </div>
       <div class="form-row" style="margin-bottom:14px">
@@ -176,11 +172,14 @@ async function loadDashboard() {
 }
 
 async function initRecordForm() {
-  const [subjects, classes, teachers] = await Promise.all([
-    Api.get("/admin/subjects"), Api.get("/admin/classes"), Api.get("/admin/teachers")
+  const [subjects, classes, teachers, periodsData] = await Promise.all([
+    Api.get("/admin/subjects"), Api.get("/admin/classes"), Api.get("/admin/teachers"), Api.get("/admin/periods/active")
   ]);
   UI.populateSelect("rec-subject", subjects, "id", "subject_name", "Select subject…");
   UI.populateSelect("rec-class",   classes,  "id", "class_name",   "Select class…");
+  const periods = periodsData.periods || [];
+  const pSel = document.getElementById("rec-period");
+  if(pSel){ pSel.innerHTML='<option value="">Select Period</option>'+periods.map(p=><option value=""></option>).join(""); }
   UI.initTeacherSearch({inputId:"teacher-input", hiddenId:"teacher-id", dropdownId:"teacher-dropdown", teachers});
 }
 

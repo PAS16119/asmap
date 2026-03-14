@@ -226,7 +226,15 @@ def teacher_summary():
     result = []
     for t in teachers:
         q = MonitoringRecord.query.filter_by(teacher_id=t.id)
-        records = q.all()
+        all_records = q.all()
+        # Deduplicate: same teacher + date + period = one attendance
+        seen = set()
+        records = []
+        for r in all_records:
+            key = (r.teacher_id, str(r.attendance_date), r.period or str(r.id), r.session_type)
+            if key not in seen:
+                seen.add(key)
+                records.append(r)
 
         normal_total    = sum(1 for r in records if r.session_type == 'Normal')
         normal_ontime   = sum(1 for r in records if r.session_type == 'Normal' and r.is_on_time is True)
