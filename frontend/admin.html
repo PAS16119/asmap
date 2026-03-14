@@ -249,7 +249,34 @@
         </div>
       </div>
     </div>
-  </div>
+
+    <!-- PERIOD MANAGEMENT -->
+    <div class="card" style="margin-top:20px" id="section-periods-card">
+      <div class="card-header">
+        <span class="card-title">Period Management</span>
+        <button class="btn btn-primary btn-sm" onclick="document.getElementById('add-period-form').style.display='block'">+ Add Period</button>
+      </div>
+      <div id="setup-periods"><div style="color:var(--text-3);padding:12px">Loading periods...</div></div>
+      <div id="add-period-form" style="display:none;margin-top:16px;padding:16px;background:var(--bg-2);border-radius:8px">
+        <h4 style="margin:0 0 12px;color:var(--gold)">Add / Edit Period</h4>
+        <input type="hidden" id="period-edit-id" value="">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div><label class="form-label">Period Name *</label><input class="form-control" id="period-name" placeholder="e.g. Period 1"></div>
+          <div><label class="form-label">Session Type</label>
+            <select class="form-select" id="period-session">
+              <option value="Normal">Normal</option>
+              <option value="Extended Teaching">Extended Teaching</option>
+            </select>
+          </div>
+          <div><label class="form-label">Start Time</label><input type="time" class="form-control" id="period-start"></div>
+          <div><label class="form-label">End Time</label><input type="time" class="form-control" id="period-end"></div>
+        </div>
+        <div style="margin-top:12px;display:flex;gap:10px">
+          <button class="btn btn-primary" onclick="savePeriod()">Save Period</button>
+          <button class="btn btn-ghost" onclick="document.getElementById('add-period-form').style.display='none';document.getElementById('period-edit-id').value=''">Cancel</button>
+        </div>
+      </div>
+    </div>
 
   </div><!-- /page-content -->
 </div><!-- /main-content -->
@@ -612,16 +639,76 @@ async function loadReports() {
     document.getElementById("report-class-count").textContent= data.by_class.length;
     const maxC = Math.max(1,...data.by_class.map(r=>r.total));
     document.getElementById("report-by-class").innerHTML = data.by_class.length
-      ? data.by_class.map(r=>`<div class="report-row"><div style="flex:1"><div style="display:flex;justify-content:space-between"><span style="font-weight:500">${r.class_name}</span><div style="text-align:right"><div class="amount" style="font-size:.92rem">${UI.currency(r.total)}</div><div style="font-size:.7rem;color:var(--text-3)">${r.count} tx</div></div></div><div class="bar-track"><div class="bar-fill" style="width:${(r.total/maxC*100).toFixed(1)}%"></div></div></div></div>`).join("") : UI.empty("No data");
+      ? data.by_class.map(r=>`<div class="report-row" style="cursor:pointer" onclick="expandReport('class','${r.class_name}',${r.class_id||0})"><div style="flex:1"><div style="display:flex;justify-content:space-between"><span style="font-weight:500">${r.class_name}</span><div style="text-align:right"><div class="amount" style="font-size:.92rem">${UI.currency(r.total)}</div><div style="font-size:.7rem;color:var(--text-3)">${r.count} tx (click)</div></div></div><div class="bar-track"><div class="bar-fill" style="width:${(r.total/maxC*100).toFixed(1)}%"></div></div></div><div id="expand-class-${r.class_id||0}" style="display:none;margin-top:8px"></div></div>`).join("") : UI.empty("No data");
     const maxP = Math.max(1,...data.by_purpose.map(r=>r.total));
     document.getElementById("report-by-purpose").innerHTML = data.by_purpose.length
-      ? data.by_purpose.map(r=>`<div class="report-row"><div style="flex:1"><div style="display:flex;justify-content:space-between"><span>${r.purpose}</span><div style="text-align:right"><div class="amount" style="font-size:.92rem">${UI.currency(r.total)}</div><div style="font-size:.7rem;color:var(--text-3)">${r.count} tx</div></div></div><div class="bar-track"><div class="bar-fill" style="width:${(r.total/maxP*100).toFixed(1)}%"></div></div></div></div>`).join("") : UI.empty("No data");
+      ? data.by_purpose.map(r=>`<div class="report-row" style="cursor:pointer" onclick="expandReport('purpose','${r.purpose}',0)"><div style="flex:1"><div style="display:flex;justify-content:space-between"><span>${r.purpose}</span><div style="text-align:right"><div class="amount" style="font-size:.92rem">${UI.currency(r.total)}</div><div style="font-size:.7rem;color:var(--text-3)">${r.count} tx (click)</div></div></div><div class="bar-track"><div class="bar-fill" style="width:${(r.total/maxP*100).toFixed(1)}%"></div></div></div><div id="expand-purpose-${r.purpose.replace(/ /g,'-')}" style="display:none;margin-top:8px"></div></div>`).join("") : UI.empty("No data");
     document.getElementById("report-by-collector").innerHTML = data.by_collector.length
       ? `<table class="table"><thead><tr><th>Collector</th><th>Total (GHS)</th><th>Transactions</th></tr></thead><tbody>` +
         data.by_collector.map(r=>`<tr><td><strong>${r.name}</strong></td><td class="amount">${UI.currency(r.total)}</td><td style="color:var(--text-2)">${r.count}</td></tr>`).join("") + `</tbody></table>`
       : UI.empty("No data");
   } catch(e) { Toast.error(e.message); }
 }
+
+async function expandReport(type, value, id) {
+  const yp = activeYear ? "?year_id=" + activeYear.id : "";
+  const elId = type==="class" ? "expand-class-"+id : "expand-purpose-"+value.replace(/ /g,"-");
+  const el = document.getElementById(elId);
+  if (!el) return;
+  if (el.style.display !== "none") { el.style.display="none"; return; }
+  el.style.display="block";
+  el.innerHTML = "<div style='color:var(--text-3);font-size:.8rem;padding:8px'>Loading...</div>";
+  try {
+    let url = "/admin/payments" + (yp||"?");
+    if(type==="class") url += (yp?"&":"?") + "class_id="+id;
+    else url += (yp?"&":"?") + "purpose="+encodeURIComponent(value);
+    const data = await Api.get(url);
+    const payments = data.payments || data;
+    if(!payments.length){ el.innerHTML="<div style='color:var(--text-3);font-size:.8rem;padding:8px'>No records found</div>"; return; }
+    el.innerHTML = "<table class='table' style='font-size:.8rem;margin-top:4px'><thead><tr><th>Student</th><th>Purpose</th><th>Amount</th><th>Date</th><th>Status</th></tr></thead><tbody>"+
+      payments.map(p=>`<tr><td>${p.student_name}</td><td>${p.purpose}</td><td class="amount">${UI.currency(p.amount)}</td><td style="color:var(--text-3)">${UI.date(p.created_at)}</td><td>${UI.badge(p.is_confirmed?"Confirmed":"Pending",p.is_confirmed?"green":"warning")}</td></tr>`).join("")+
+      "</tbody></table>";
+  } catch(e) { el.innerHTML="<div style='color:red;font-size:.8rem;padding:8px'>Error: "+e.message+"</div>"; }
+}
+
+
+async function savePeriod() {
+  const id = document.getElementById("period-edit-id").value;
+  const body = {
+    name: document.getElementById("period-name").value.trim(),
+    start_time: document.getElementById("period-start").value||null,
+    end_time: document.getElementById("period-end").value||null,
+    session_type: document.getElementById("period-session").value
+  };
+  if(!body.name){ Toast.error("Period name required"); return; }
+  try {
+    if(id) await Api.put("/admin/periods/"+id, body);
+    else await Api.post("/admin/periods", body);
+    Toast.success("Period saved!");
+    document.getElementById("add-period-form").style.display="none";
+    document.getElementById("period-edit-id").value="";
+    delete sectionLoaded["setup"]; loadSetup();
+  } catch(e){ Toast.error(e.message); }
+}
+
+function editPeriod(id,name,start,end,session){
+  document.getElementById("period-edit-id").value=id;
+  document.getElementById("period-name").value=name;
+  document.getElementById("period-start").value=start;
+  document.getElementById("period-end").value=end;
+  document.getElementById("period-session").value=session;
+  document.getElementById("add-period-form").style.display="block";
+}
+
+async function deletePeriod(id){
+  if(!confirm("Delete this period?")) return;
+  try {
+    await Api.delete("/admin/periods/"+id);
+    Toast.success("Period deleted");
+    delete sectionLoaded["setup"]; loadSetup();
+  } catch(e){ Toast.error(e.message); }
+}
+
 async function loadLookupStudents() {
   const cid = document.getElementById("lookup-class").value;
   if (!cid) return;
@@ -764,10 +851,10 @@ async function downloadTemplate() {
 
 // ── SETUP ───────────────────────────────────────────────────────────────────
 async function loadSetup() {
-  const [teachers, classes, subjects, assignments, users] = await Promise.all([
+  const [teachers, classes, subjects, assignments, users, periodsData] = await Promise.all([
     Api.get("/admin/teachers"), Api.get("/admin/classes"),
     Api.get("/admin/subjects"), Api.get("/admin/coordinator/assignments"),
-    Api.get("/admin/users")
+    Api.get("/admin/users"), Api.get("/admin/periods")
   ]);
   allClasses  = classes;
   allSubjects = subjects;
@@ -775,7 +862,7 @@ async function loadSetup() {
   UI.populateSelect("assign-coordinator", coords,  "id", "full_name", "Select coordinator…");
   UI.populateSelect("assign-class",       classes, "id", "class_name","Select class…");
   // Populate subject select for teacher modal
-  UI.populateSelect("teacher-subject-sel", subjects, "id", "subject_name", "Select subject…");
+  UI.populateSelect("teacher-subject-sel", subjects, "id", "name", "Select subject…");
 
   document.getElementById("setup-teachers-list").innerHTML = teachers.length
     ? teachers.map(t=>`<div class="report-row"><div><div style="font-weight:500">${t.teacher_name}</div><div style="font-size:.78rem;color:var(--text-3)">${t.subject||"No subject"}</div></div><button class="btn btn-ghost btn-sm" onclick="toggleTeacher(${t.id},${t.is_active})">${t.is_active?"Disable":"Enable"}</button></div>`).join("") : UI.empty("No teachers yet");
@@ -788,6 +875,15 @@ async function loadSetup() {
 
   document.getElementById("setup-assign-list").innerHTML = assignments.length
     ? assignments.map(a=>`<div class="report-row"><div><div style="font-weight:500">${a.coordinator_name}</div><div style="font-size:.78rem;color:var(--text-3)">${a.class_name}</div></div><button class="btn btn-danger btn-sm" onclick="removeAssignment(${a.id})">Remove</button></div>`).join("") : UI.empty("No assignments yet");
+
+  // Render periods
+  const periods = periodsData ? (periodsData.periods || periodsData) : [];
+  const pContainer = document.getElementById("setup-periods");
+  if(pContainer){
+    pContainer.innerHTML = periods.length
+      ? periods.map(p=>`<div style="display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--border);border-radius:6px;margin-bottom:8px"><div style="flex:1"><strong>${p.name}</strong><span style="color:var(--text-3);font-size:.8rem;margin-left:8px">${p.start_time||""}${p.start_time&&p.end_time?" - ":""}${p.end_time||""}</span><span style="margin-left:8px">${UI.badge(p.session_type==="Normal"?"Normal":"Extended","blue")}</span></div><button class="btn btn-ghost btn-sm" onclick="editPeriod(${p.id},'${p.name}','${p.start_time||""}','${p.end_time||""}','${p.session_type}')">Edit</button><button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="deletePeriod(${p.id})">Del</button></div>`).join("")
+      : "<p style='color:var(--text-3)'>No periods yet. Add one below.</p>";
+  }
 }
 async function saveTeacher() {
   const name = document.getElementById("teacher-name").value.trim();

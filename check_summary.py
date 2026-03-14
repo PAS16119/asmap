@@ -1,0 +1,10 @@
+# Check supervisor and coordinator teacher summary routes
+fs=open(r'D:\ADOMBRA PROJECTS\ASMAP\ASMAP V1\ASMaP_v1.0_complete\asmap\backend\routes\supervisor.py','r',encoding='utf-8').read()
+fc=open(r'D:\ADOMBRA PROJECTS\ASMAP\ASMAP V1\ASMaP_v1.0_complete\asmap\backend\routes\coordinator.py','r',encoding='utf-8').read()
+ts=fs.find('teacher-summary')
+tc=fc.find('teacher-summary')
+print('SUPERVISOR teacher-summary route:')
+print(fs[ts:ts+500])
+print()
+print('COORDINATOR teacher-summary route:')
+print(fc[tc:tc+500])

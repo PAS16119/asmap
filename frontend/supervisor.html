@@ -175,7 +175,7 @@ async function initRecordForm() {
   const [subjects, classes, teachers, periodsData] = await Promise.all([
     Api.get("/admin/subjects"), Api.get("/admin/classes"), Api.get("/admin/teachers"), Api.get("/admin/periods/active")
   ]);
-  UI.populateSelect("rec-subject", subjects, "id", "subject_name", "Select subject…");
+  UI.populateSelect("rec-subject", subjects, "id", "name", "Select subject…");
   UI.populateSelect("rec-class",   classes,  "id", "class_name",   "Select class…");
   const periods = periodsData.periods || [];
   const pSel = document.getElementById("rec-period");

@@ -1,0 +1,7 @@
+﻿fa=open(r'D:\ADOMBRA PROJECTS\ASMAP\ASMAP V1\ASMaP_v1.0_complete\asmap\frontend\admin.html','r',encoding='utf-8').read()
+pos=fa.find('async function loadSetup')
+print('--- loadSetup end ---')
+print(repr(fa[pos+2700:pos+3200]))
+pos2=fa.find('id="section-setup"')
+print('--- section-setup end ---')
+print(repr(fa[pos2+5200:pos2+6200]))

@@ -1,0 +1,10 @@
+f=open(r'D:\ADOMBRA PROJECTS\ASMAP\ASMAP V1\ASMaP_v1.0_complete\asmap\frontend\supervisor.html','r',encoding='utf-8').read()
+import re
+navs=re.findall(r'onclick="go\([^"]+\)"',f)
+print('Supervisor nav handlers:')
+for n in navs: print(' ',n)
+sc=f.find('<script src="assets/api.js">')
+print('api.js position in supervisor:',sc)
+head=f.find('</head>')
+print('</head> position:',head)
+print('api.js in head:',sc<head)
