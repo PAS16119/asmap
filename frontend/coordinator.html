@@ -63,8 +63,9 @@ async function loadRecordStudents() {
   list.innerHTML = UI.loading();
   try {
     const students = await Api.get("/coordinator/students/" + cid + (activeYear?"?year_id="+activeYear.id:""));
-    list.innerHTML = students.length
-      ? students.map(s=>`<div class="student-card" id="sc-${s.id}" onclick="selectStudent(${s.id},'${s.student_name.replace(/'/g,"\\'")}')" ><span style="font-weight:500">${s.student_name}</span><span style="font-size:.77rem;color:var(--text-3)">Tap to select</span></div>`).join("") : UI.empty("No students in this class");
+    if(!students.length){ list.innerHTML=UI.empty("No students in this class"); return; }
+    window._allStudents = students;
+    list.innerHTML = '<input type="text" id="student-search" class="form-input" placeholder="Search student name..." oninput="filterStudents(this.value)" style="margin-bottom:10px;width:100%;box-sizing:border-box"><div id="student-cards">' + students.map(s=><div class="student-card" id="sc-" onclick="selectStudent(,'')"><span style="font-weight:500"></span><span style="font-size:.77rem;color:var(--text-3)">Tap to select</span></div>).join("") + '</div>';
   } catch(e) { list.innerHTML = UI.empty("Failed to load"); }
 }
 
@@ -175,6 +176,7 @@ function initCoordMonitoring(){
   var d=document.getElementById('monDate');if(d)d.value=new Date().toISOString().split('T')[0];
   fetch(base+'/admin/subjects',{headers:h}).then(function(r){return r.json();}).then(function(d){
     var sel=document.getElementById('monSubject');if(!sel)return;
+    window._allSubjects = d.subjects||[];
     (d.subjects||[]).forEach(function(s){var o=document.createElement('option');o.value=s.id;o.textContent=s.name;sel.appendChild(o);});
   }).catch(function(){});
   fetch(base+'/admin/periods/active',{headers:h}).then(function(r){return r.json();}).then(function(d){
@@ -188,6 +190,40 @@ function initCoordMonitoring(){
   fetch(base+'/admin/teachers',{headers:h}).then(function(r){return r.json();}).then(function(d){coordAllTeachers=d.teachers||[];}).catch(function(){});
   loadCoordMonitoringRecords();
 }
+
+function filterStudents(q) {
+  const cards = document.getElementById('student-cards');
+  if (!cards || !window._allStudents) return;
+  const filtered = q ? window._allStudents.filter(s => s.student_name.toLowerCase().includes(q.toLowerCase())) : window._allStudents;
+  cards.innerHTML = filtered.length
+    ? filtered.map(s=><div class="student-card" id="sc-" onclick="selectStudent(,'')"><span style="font-weight:500"></span><span style="font-size:.77rem;color:var(--text-3)">Tap to select</span></div>).join("")
+    : UI.empty("No match found");
+}
+
+function showSubjectDropdown() {
+  filterSubjects(document.getElementById('monSubjectSearch').value);
+}
+
+function filterSubjects(q) {
+  const dd = document.getElementById('monSubjectDropdown');
+  if (!dd || !window._allSubjects) return;
+  const filtered = q ? window._allSubjects.filter(s => s.name.toLowerCase().includes(q.toLowerCase())) : window._allSubjects;
+  dd.style.display = filtered.length ? 'block' : 'none';
+  dd.innerHTML = filtered.map(s=><div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border)" onmousedown="selectSubject(,'')"></div>).join('');
+}
+
+function selectSubject(id, name) {
+  document.getElementById('monSubject').value = id;
+  document.getElementById('monSubjectSearch').value = name;
+  document.getElementById('monSubjectDropdown').style.display = 'none';
+}
+
+document.addEventListener('click', function(e) {
+  const dd = document.getElementById('monSubjectDropdown');
+  const inp = document.getElementById('monSubjectSearch');
+  if (dd && inp && !inp.contains(e.target) && !dd.contains(e.target)) dd.style.display = 'none';
+});
+
 function coordSearchTeacher(query){
   var dd=document.getElementById('coordTeacherDropdown');
   if(!query||query.length<2){dd.innerHTML='';return;}
@@ -346,7 +382,11 @@ async function loadCoordTeacherSummary(){
         <div id="coordTeacherDropdown"></div>
         <input type="hidden" id="monTeacherId" />
       </div>
-      <div><label class="form-label">Subject</label><select id="monSubject" class="form-input"><option value="">Select Subject</option></select></div>
+      <div><label class="form-label">Subject</label>
+        <input type="text" id="monSubjectSearch" class="form-input" placeholder="Type subject name..." oninput="filterSubjects(this.value)" onfocus="showSubjectDropdown()" autocomplete="off" />
+        <input type="hidden" id="monSubject" />
+        <div id="monSubjectDropdown" style="display:none;position:absolute;z-index:999;background:var(--bg-1);border:1px solid var(--border);border-radius:6px;max-height:200px;overflow-y:auto;width:100%"></div>
+      </div>
       <div><label class="form-label">Class</label><select id="monClass" class="form-input"><option value="">Select Class</option></select></div>
       <div><label class="form-label">Period</label>
         <select id="monPeriod" class="form-input">

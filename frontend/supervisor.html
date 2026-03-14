@@ -70,7 +70,12 @@
       </div>
 
       <div class="form-row" style="margin-bottom:14px">
-        <div class="form-group"><label class="form-label">Subject *</label><select class="form-select" id="rec-subject"><option value="">Select subject…</option></select></div>
+        <div class="form-group"><label class="form-label">Subject *</label>
+          <div style="position:relative">
+            <input type="text" class="form-control" id="rec-subject-search" placeholder="Type subject name..." oninput="supFilterSubjects(this.value)" onfocus="supShowSubjects()" autocomplete="off">
+            <input type="hidden" id="rec-subject">
+            <div id="rec-subject-dropdown" style="display:none;position:absolute;z-index:999;background:var(--bg-1);border:1px solid var(--border);border-radius:6px;max-height:200px;overflow-y:auto;width:100%"></div>
+          </div></div>
         <div class="form-group"><label class="form-label">Class *</label><select class="form-select" id="rec-class"><option value="">Select class…</option></select></div>
       </div>
       <div class="form-row" style="margin-bottom:14px">
@@ -175,7 +180,7 @@ async function initRecordForm() {
   const [subjects, classes, teachers, periodsData] = await Promise.all([
     Api.get("/admin/subjects"), Api.get("/admin/classes"), Api.get("/admin/teachers"), Api.get("/admin/periods/active")
   ]);
-  UI.populateSelect("rec-subject", subjects, "id", "name", "Select subject…");
+  window._supSubjects = subjects; supFilterSubjects("");
   UI.populateSelect("rec-class",   classes,  "id", "class_name",   "Select class…");
   const periods = periodsData.periods || [];
   const pSel = document.getElementById("rec-period");
@@ -183,7 +188,32 @@ async function initRecordForm() {
   UI.initTeacherSearch({inputId:"teacher-input", hiddenId:"teacher-id", dropdownId:"teacher-dropdown", teachers});
 }
 
-async function submitRecord() {
+async 
+function supFilterSubjects(q) {
+  const dd = document.getElementById('rec-subject-dropdown');
+  if (!dd || !window._supSubjects) return;
+  const filtered = q ? window._supSubjects.filter(s => s.name.toLowerCase().includes(q.toLowerCase())) : window._supSubjects;
+  dd.style.display = filtered.length ? 'block' : 'none';
+  dd.innerHTML = filtered.map(s=><div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border)" onmousedown="supSelectSubject(,'')"></div>).join('');
+}
+
+function supShowSubjects() {
+  supFilterSubjects(document.getElementById('rec-subject-search').value);
+}
+
+function supSelectSubject(id, name) {
+  document.getElementById('rec-subject').value = id;
+  document.getElementById('rec-subject-search').value = name;
+  document.getElementById('rec-subject-dropdown').style.display = 'none';
+}
+
+document.addEventListener('click', function(e) {
+  const dd = document.getElementById('rec-subject-dropdown');
+  const inp = document.getElementById('rec-subject-search');
+  if (dd && inp && !inp.contains(e.target) && !dd.contains(e.target)) dd.style.display = 'none';
+});
+
+function submitRecord() {
   const teacher_id = document.getElementById("teacher-id").value;
   const subject_id = document.getElementById("rec-subject").value;
   const class_id   = document.getElementById("rec-class").value;
@@ -217,7 +247,7 @@ async function submitRecord() {
     Toast.success("Record saved ✓ — " + session + " session recorded");
     // Reset
     document.getElementById("teacher-input").value = ""; document.getElementById("teacher-id").value = "";
-    document.getElementById("rec-subject").value = ""; document.getElementById("rec-class").value = "";
+    document.getElementById("rec-subject").value = ""; document.getElementById("rec-subject-search").value = ""; document.getElementById("rec-class").value = "";
     document.getElementById("rec-students").value = ""; document.getElementById("rec-period").value = "";
     document.getElementById("rec-time-in").value = ""; document.getElementById("rec-notes").value = "";
     document.getElementById("rec-date").value = new Date().toISOString().split("T")[0];
