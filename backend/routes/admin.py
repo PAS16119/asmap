@@ -1,4 +1,4 @@
-import base64
+﻿import base64
 from flask import Blueprint, request, jsonify, send_file
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from functools import wraps
@@ -17,7 +17,7 @@ from datetime import datetime
 admin_bp = Blueprint('admin', __name__)
 
 
-# ── Decorators ────────────────────────────────────────────────────────────────
+# â”€â”€ Decorators â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def admin_required(fn):
     @wraps(fn)
     @jwt_required()
@@ -37,10 +37,10 @@ def _active_year():
     return AcademicYear.query.filter_by(is_active=True).first()
 
 
-# ── SCHOOL SETTINGS ───────────────────────────────────────────────────────────
+# â”€â”€ SCHOOL SETTINGS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @admin_bp.route('/settings/public', methods=['GET'])
 def settings_public():
-    """Unauthenticated — used by login page."""
+    """Unauthenticated â€” used by login page."""
     s = SchoolSettings.query.first()
     if not s:
         return jsonify({'school_name': 'Your School', 'school_short': '', 'school_motto': '', 'school_logo': ''})
@@ -110,7 +110,7 @@ def upload_logo():
     return jsonify({'message': 'Logo uploaded', 'logo': data_url})
 
 
-# ── ACADEMIC YEARS ────────────────────────────────────────────────────────────
+# â”€â”€ ACADEMIC YEARS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @admin_bp.route('/years', methods=['GET'])
 @jwt_required()
 def list_years():
@@ -150,7 +150,7 @@ def activate_year(yid):
     return jsonify(y.to_dict())
 
 
-# ── DASHBOARD ─────────────────────────────────────────────────────────────────
+# â”€â”€ DASHBOARD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @admin_bp.route('/dashboard', methods=['GET'])
 @admin_required
 def dashboard():
@@ -176,12 +176,12 @@ def dashboard():
     purpose_rows = pq.group_by(Payment.purpose).all()
 
     # Class breakdown
-    cq = (db.session.query(Class.class_name, func.sum(Payment.amount).label('t'), func.count(Payment.id).label('c'))
+    cq = (db.session.query(Class.name, func.sum(Payment.amount).label('t'), func.count(Payment.id).label('c'))
           .join(Student, Student.id == Payment.student_id)
           .join(Class, Class.id == Student.class_id))
     if year_id:
         cq = cq.filter(Payment.academic_year_id == year_id)
-    class_rows = cq.group_by(Class.class_name).order_by(Class.class_name).all()
+    class_rows = cq.group_by(Class.name).order_by(Class.name).all()
 
     return jsonify({
         'total_students':      s_query.count(),
@@ -197,7 +197,7 @@ def dashboard():
     })
 
 
-# ── USERS ─────────────────────────────────────────────────────────────────────
+# â”€â”€ USERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @admin_bp.route('/users', methods=['GET'])
 @admin_required
 def list_users():
@@ -249,7 +249,7 @@ def update_user(uid):
     return jsonify(u.to_dict())
 
 
-# ── TEACHERS ──────────────────────────────────────────────────────────────────
+# â”€â”€ TEACHERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @admin_bp.route('/teachers', methods=['GET'])
 @jwt_required()
 def list_teachers():
@@ -295,7 +295,7 @@ def delete_teacher(tid):
     return jsonify({'message': 'Teacher deactivated'})
 
 
-# ── SUBJECTS ──────────────────────────────────────────────────────────────────
+# â”€â”€ SUBJECTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @admin_bp.route('/subjects', methods=['GET'])
 @jwt_required()
 def list_subjects():
@@ -326,11 +326,11 @@ def delete_subject(sid):
     return jsonify({'message': 'Deleted'})
 
 
-# ── CLASSES ───────────────────────────────────────────────────────────────────
+# â”€â”€ CLASSES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @admin_bp.route('/classes', methods=['GET'])
 @jwt_required()
 def list_classes():
-    return jsonify([c.to_dict() for c in Class.query.order_by(Class.class_name).all()])
+    return jsonify([c.to_dict() for c in Class.query.order_by(Class.name).all()])
 
 
 @admin_bp.route('/classes', methods=['POST'])
@@ -357,7 +357,7 @@ def delete_class(cid):
     return jsonify({'message': 'Deleted'})
 
 
-# ── STUDENTS ──────────────────────────────────────────────────────────────────
+# â”€â”€ STUDENTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @admin_bp.route('/students', methods=['GET'])
 @jwt_required()
 def list_students():
@@ -481,7 +481,7 @@ def export_students():
                      as_attachment=True, download_name='students_export.xlsx')
 
 
-# ── COORDINATOR ASSIGNMENTS ───────────────────────────────────────────────────
+# â”€â”€ COORDINATOR ASSIGNMENTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @admin_bp.route('/coordinator/assignments', methods=['GET'])
 @admin_required
 def list_assignments():
@@ -515,7 +515,7 @@ def remove_assignment(aid):
     return jsonify({'message': 'Assignment removed'})
 
 
-# ── PAYMENTS ──────────────────────────────────────────────────────────────────
+# â”€â”€ PAYMENTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @admin_bp.route('/payments', methods=['GET'])
 @admin_required
 def list_payments():
@@ -604,7 +604,7 @@ def student_payment_breakdown(student_id):
                     'payments': [p.to_dict() for p in payments]})
 
 
-# ── PAYMENT REPORTS ───────────────────────────────────────────────────────────
+# â”€â”€ PAYMENT REPORTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @admin_bp.route('/reports/payments', methods=['GET'])
 @admin_required
 def payment_reports():
@@ -613,12 +613,12 @@ def payment_reports():
     def filtered(q):
         return q.filter(Payment.academic_year_id == year_id) if year_id else q
 
-    by_class = (db.session.query(Class.id.label('cid'), Class.class_name,
+    by_class = (db.session.query(Class.id.label('cid'), Class.name,
                                   func.sum(Payment.amount).label('t'),
                                   func.count(Payment.id).label('c'))
                 .join(Student, Student.id == Payment.student_id)
                 .join(Class, Class.id == Student.class_id))
-    by_class = filtered(by_class).group_by(Class.id, Class.class_name).order_by(Class.class_name).all()
+    by_class = filtered(by_class).group_by(Class.id, Class.name).order_by(Class.name).all()
 
     by_purpose = db.session.query(Payment.purpose,
                                    func.sum(Payment.amount).label('t'),
@@ -675,11 +675,11 @@ def export_payment_report():
     ws2 = wb.create_sheet('By Class')
     ws2.append(['Class', 'Total (GHS)', 'Transactions'])
     hrow(ws2)
-    by_class = (db.session.query(Class.class_name, func.sum(Payment.amount), func.count(Payment.id))
+    by_class = (db.session.query(Class.name, func.sum(Payment.amount), func.count(Payment.id))
                 .join(Student, Student.id == Payment.student_id)
                 .join(Class, Class.id == Student.class_id))
     if year_id: by_class = by_class.filter(Payment.academic_year_id == int(year_id))
-    for r in by_class.group_by(Class.class_name).order_by(Class.class_name).all():
+    for r in by_class.group_by(Class.name).order_by(Class.name).all():
         ws2.append([r[0], float(r[1]), r[2]])
     for col, w in [('A',24),('B',20),('C',16)]: ws2.column_dimensions[col].width = w
 
@@ -698,7 +698,7 @@ def export_payment_report():
                      as_attachment=True, download_name=fname)
 
 
-# ── MONITORING ────────────────────────────────────────────────────────────────
+# â”€â”€ MONITORING â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @admin_bp.route('/monitoring', methods=['GET'])
 @admin_required
 def list_monitoring():
@@ -774,12 +774,12 @@ def teacher_evaluation_report():
 
     result.sort(key=lambda x: x['total'], reverse=True)
     return jsonify(result)
-# ════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # PASTE THESE ROUTES INTO YOUR EXISTING routes/admin.py
 # Place them AFTER the existing /teachers GET/POST route
-# ════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-# ── GET /admin/teachers/template  — download blank Excel template ────────────
+# â”€â”€ GET /admin/teachers/template  â€” download blank Excel template â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @admin_bp.route('/teachers/template', methods=['GET'])
 @jwt_required()
 def teacher_template():
@@ -826,7 +826,7 @@ def teacher_template():
                      as_attachment=True, download_name='teachers_template.xlsx')
 
 
-# ── POST /admin/teachers/import  — bulk import from Excel ───────────────────
+# â”€â”€ POST /admin/teachers/import  â€” bulk import from Excel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @admin_bp.route('/teachers/import', methods=['POST'])
 @jwt_required()
 def import_teachers():
@@ -864,7 +864,7 @@ def import_teachers():
         subject_str = str(row[2]).strip().upper() if len(row) > 2 and row[2] else ''
 
         if not full_name:
-            errors.append(f'Row {row_num}: Name is empty — skipped')
+            errors.append(f'Row {row_num}: Name is empty â€” skipped')
             skipped += 1
             continue
 
@@ -905,7 +905,7 @@ def import_teachers():
     })
 
 
-# ── GET /admin/teachers/export  — export all teachers to Excel ───────────────
+# â”€â”€ GET /admin/teachers/export  â€” export all teachers to Excel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @admin_bp.route('/teachers/export', methods=['GET'])
 @jwt_required()
 def export_teachers():
@@ -948,7 +948,7 @@ def export_teachers():
                      as_attachment=True, download_name='teachers_export.xlsx')
 
 
-# ── POST /admin/classes/import  — bulk class creation ───────────────────────
+# â”€â”€ POST /admin/classes/import  â€” bulk class creation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @admin_bp.route('/classes/import', methods=['POST'])
 @jwt_required()
 def import_classes():
@@ -980,7 +980,7 @@ def import_classes():
                     'created': created, 'skipped': skipped})
 
 
-# ── POST /admin/teachers/<id>/subjects  — assign multiple subjects to teacher ─
+# â”€â”€ POST /admin/teachers/<id>/subjects  â€” assign multiple subjects to teacher â”€
 @admin_bp.route('/teachers/<int:teacher_id>/subjects', methods=['POST'])
 @jwt_required()
 def set_teacher_subjects(teacher_id):
@@ -998,7 +998,7 @@ def set_teacher_subjects(teacher_id):
     return jsonify({'message': 'Subjects updated', 'teacher': teacher.to_dict()})
 
 
-# ── GET /admin/teachers/<id>/subjects  — get teacher's subjects ──────────────
+# â”€â”€ GET /admin/teachers/<id>/subjects  â€” get teacher's subjects â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @admin_bp.route('/teachers/<int:teacher_id>/subjects', methods=['GET'])
 @jwt_required()
 def get_teacher_subjects(teacher_id):
@@ -1008,4 +1008,5 @@ def get_teacher_subjects(teacher_id):
 
     teacher = Teacher.query.get_or_404(teacher_id)
     return jsonify({'subjects': [s.to_dict() for s in teacher.subjects]})
+
 
