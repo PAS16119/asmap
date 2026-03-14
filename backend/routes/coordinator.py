@@ -301,7 +301,15 @@ def coord_teacher_summary():
     teachers = Teacher.query.filter_by(is_active=True).all()
     result = []
     for t in teachers:
-        records = MonitoringRecord.query.filter_by(teacher_id=t.id).all()
+        all_records = MonitoringRecord.query.filter_by(teacher_id=t.id).all()
+        # Deduplicate: same teacher + date + period = one attendance (even if recorded by both sup and coord)
+        seen = set()
+        records = []
+        for r in all_records:
+            key = (r.teacher_id, str(r.attendance_date), r.period or str(r.id), r.session_type)
+            if key not in seen:
+                seen.add(key)
+                records.append(r)
         normal_total    = sum(1 for r in records if r.session_type == 'Normal')
         normal_ontime   = sum(1 for r in records if r.session_type == 'Normal' and r.is_on_time is True)
         normal_late     = sum(1 for r in records if r.session_type == 'Normal' and r.is_on_time is False)

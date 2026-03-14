@@ -166,7 +166,7 @@ async function loadDashboard() {
       <div class="stat-card"><div class="stat-label">Total Records</div><div class="stat-value">${records.length}</div><div class="stat-icon">◌</div></div>
       <div class="stat-card"><div class="stat-label">Teachers Monitored</div><div class="stat-value">${tSet.size}</div><div class="stat-icon">◎</div></div>
       <div class="stat-card"><div class="stat-label">Normal Sessions</div><div class="stat-value">${normal}</div><div class="stat-icon">◑</div></div>
-      <div class="stat-card"><div class="stat-label">Extended Sessions</div><div class="stat-value" style="color:#90caf9">${extended}</div><div class="stat-icon">◈</div></div>
+      <div class="stat-card"><div class="stat-label">Extended Teachings</div><div class="stat-value" style="color:#90caf9">${extended}</div><div class="stat-icon">◈</div></div>
       <div class="stat-card"><div class="stat-label">This Week</div><div class="stat-value">${thisWeek}</div><div class="stat-icon">▣</div></div>
       <div class="stat-card"><div class="stat-label">Students Seen</div><div class="stat-value">${records.reduce((s,r)=>s+r.students_present,0)}</div><div class="stat-icon">⊞</div></div>`;
     document.getElementById("dash-recent").innerHTML = records.length

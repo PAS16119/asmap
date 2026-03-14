@@ -50,7 +50,7 @@ async function loadOverview() {
 }
 
 async function loadRecordSection() {
-  UI.populateSelect("rec-class", myClasses, "class_id", "class_name", "Choose class…");
+  UI.populateSelect("rec-class", Array.isArray(myClasses)?myClasses:(myClasses.classes||[]), "class_id", "class_name", "Choose class…");
 }
 
 async function loadRecordStudents() {
@@ -103,7 +103,7 @@ async function recordPayment() {
 }
 
 async function loadHistorySection() {
-  UI.populateSelect("hist-class", myClasses, "class_id", "class_name", "All My Classes");
+  UI.populateSelect("hist-class", Array.isArray(myClasses)?myClasses:(myClasses.classes||[]), "class_id", "class_name", "All My Classes");
   loadHistory();
 }
 
@@ -333,7 +333,7 @@ async function loadCoordTeacherSummary(){
       <div><label class="form-label">Session Type *</label>
         <select id="monSession" class="form-input">
           <option value="Normal">Normal (Day Class)</option>
-          <option value="Extended">Extended (Evening)</option>
+          <option value="Extended">Extended Teaching</option>
         </select>
       </div>
       <div>
@@ -354,7 +354,7 @@ async function loadCoordTeacherSummary(){
           <option value="Period 5 (11:30-12:20)">Period 5 (11:30 - 12:20)</option>
           <option value="Period 6 (12:20-13:10)">Period 6 (12:20 - 13:10)</option>
           <option value="Period 7 (13:10-14:00)">Period 7 (13:10 - 14:00)</option>
-          <option value="Extended Session">Extended Session</option>
+          <option value="Extended Teaching">Extended Teaching</option>
         </select>
       </div>
       <div><label class="form-label">Teacher Arrived (HH:MM)</label><input type="time" id="monTimeIn" class="form-input" /></div>
