@@ -106,7 +106,7 @@ class Subject(db.Model):
     name = db.Column(db.String(100), unique=True, nullable=False)
 
     def to_dict(self):
-        return {'id': self.id, 'name': self.name}
+        return {'id': self.id, 'name': self.name, 'subject_name': self.name}
 
 
 # ── Class ─────────────────────────────────────────────────────────────────────
