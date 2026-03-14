@@ -6,6 +6,235 @@
 <title>ASMaP — Coordinator</title>
 <link rel="stylesheet" href="assets/style.css">
 <script src="assets/api.js"></script>
+<script>
+
+let myClasses = []; let activeYear = null; let selectedStudentId = null;
+const sectionLoaded = {};
+const go = makeNav(sectionLoaded, {
+  overview:       loadOverview,
+  record:         loadRecordSection,
+  history:        loadHistorySection,
+  monitoring:     initCoordMonitoring,
+  teacherSummary: loadCoordTeacherSummary,
+});
+
+document.addEventListener("DOMContentLoaded", async () => {
+  if (!Auth.requireRole("coordinator")) return;
+  UI.initHamburger(); UI.initUserDisplay(); UI.loadFullBranding();
+  activeYear = await Api.get("/admin/years/active").catch(() => null);
+  if (activeYear) {
+    document.getElementById("active-year-badge").textContent = activeYear.label;
+    document.getElementById("coord-year-sub").textContent = "Academic Year " + activeYear.label;
+  } else {
+    document.getElementById("coord-year-sub").textContent = "No academic year active";
+  }
+  myClasses = await Api.get("/coordinator/classes").catch(() => []);
+  loadOverview();
+});
+
+async function loadOverview() {
+  try {
+    const _pr = await Api.get("/coordinator/payments"); const payments = _pr.payments || _pr;
+    const total = payments.reduce((s,p) => s + p.amount, 0);
+    const unconf = payments.filter(p => !p.is_confirmed).length;
+    document.getElementById("coord-stats").innerHTML = `
+      <div class="stat-card"><div class="stat-label">My Classes</div><div class="stat-value">${myClasses.length}</div><div class="stat-icon">▣</div></div>
+      <div class="stat-card"><div class="stat-label">I Collected</div><div class="stat-value" style="font-size:1.1rem">${UI.currency(total)}</div><div class="stat-icon">◇</div></div>
+      <div class="stat-card"><div class="stat-label">Pending Confirm</div><div class="stat-value" style="${unconf>0?"color:var(--warning)":""}">${unconf}</div><div class="stat-icon">◌</div></div>
+      <div class="stat-card"><div class="stat-label">Total Records</div><div class="stat-value">${payments.length}</div><div class="stat-icon">◈</div></div>`;
+    document.getElementById("overview-classes").innerHTML = myClasses.length
+      ? myClasses.map(a=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border)"><span style="font-weight:500">${a.class_name}</span><button class="btn btn-ghost btn-sm" onclick="go('record')">Collect</button></div>`).join("") : UI.empty("No classes assigned yet");
+    document.getElementById("overview-recent").innerHTML = payments.length
+      ? payments.slice(0,6).map(p=>`<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:.84rem"><div><div style="font-weight:500">${p.student_name}</div><div style="color:var(--text-3);font-size:.77rem">${p.class_name} · ${p.purpose}</div></div><div style="text-align:right"><div class="amount" style="font-size:.88rem">${UI.currency(p.amount)}</div><div>${UI.badge(p.is_confirmed?"✓":"Pending",p.is_confirmed?"green":"warning")}</div></div></div>`).join("") : UI.empty("No payments yet");
+  } catch(e) { Toast.error(e.message); }
+}
+
+async function loadRecordSection() {
+  UI.populateSelect("rec-class", myClasses, "class_id", "class_name", "Choose class…");
+}
+
+async function loadRecordStudents() {
+  const cid = document.getElementById("rec-class").value;
+  const list = document.getElementById("rec-students-list");
+  list.innerHTML = ""; selectedStudentId = null;
+  document.getElementById("submit-btn").disabled = true;
+  document.getElementById("selected-student-banner").style.display = "none";
+  if (!cid) return;
+  list.innerHTML = UI.loading();
+  try {
+    const students = await Api.get("/coordinator/students/" + cid + (activeYear?"?year_id="+activeYear.id:""));
+    list.innerHTML = students.length
+      ? students.map(s=>`<div class="student-card" id="sc-${s.id}" onclick="selectStudent(${s.id},'${s.student_name.replace(/'/g,"\\'")}')" ><span style="font-weight:500">${s.student_name}</span><span style="font-size:.77rem;color:var(--text-3)">Tap to select</span></div>`).join("") : UI.empty("No students in this class");
+  } catch(e) { list.innerHTML = UI.empty("Failed to load"); }
+}
+
+async function selectStudent(id, name) {
+  document.querySelectorAll(".student-card").forEach(c => c.classList.remove("selected"));
+  document.getElementById("sc-"+id)?.classList.add("selected");
+  selectedStudentId = id;
+  document.getElementById("submit-btn").disabled = false;
+  document.getElementById("selected-name").textContent = name;
+  document.getElementById("selected-total").textContent = "Loading…";
+  document.getElementById("selected-student-banner").style.display = "flex";
+  try {
+    const data = await Api.get("/coordinator/payments/student/" + id + (activeYear?"?year_id="+activeYear.id:""));
+    document.getElementById("selected-total").textContent = UI.currency(data.total_paid);
+  } catch(e) { document.getElementById("selected-total").textContent = "—"; }
+}
+
+async function recordPayment() {
+  if (!selectedStudentId) { Toast.error("Select a student first"); return; }
+  const amount  = document.getElementById("rec-amount").value;
+  const purpose = document.getElementById("rec-purpose").value;
+  const notes   = document.getElementById("rec-notes").value;
+  if (!amount || !purpose) { Toast.error("Amount and purpose required"); return; }
+  if (parseFloat(amount) <= 0) { Toast.error("Amount must be greater than 0"); return; }
+  const btn = document.getElementById("submit-btn");
+  btn.disabled = true; btn.textContent = "Saving…";
+  try {
+    await Api.post("/coordinator/payments", {student_id:selectedStudentId, amount:parseFloat(amount), purpose, notes});
+    Toast.success("Payment recorded — awaiting admin confirmation");
+    document.getElementById("rec-amount").value = "";
+    document.getElementById("rec-purpose").value = "";
+    document.getElementById("rec-notes").value = "";
+    selectStudent(selectedStudentId, document.getElementById("selected-name").textContent);
+    delete sectionLoaded["history"]; loadOverview();
+  } catch(e) { Toast.error(e.message); } finally { btn.disabled=false; btn.textContent="Submit Payment"; }
+}
+
+async function loadHistorySection() {
+  UI.populateSelect("hist-class", myClasses, "class_id", "class_name", "All My Classes");
+  loadHistory();
+}
+
+async function loadHistory() {
+  const wrap = document.getElementById("hist-table-wrap"); wrap.innerHTML = UI.loading();
+  const cid  = document.getElementById("hist-class")?.value || "";
+  try {
+    const payments = await Api.get("/coordinator/payments" + (cid?"?class_id="+cid:""));
+    const classMap = {};
+    payments.forEach(p => { if (!classMap[p.class_name]) classMap[p.class_name] = 0; classMap[p.class_name] += p.amount; });
+    document.getElementById("hist-totals").innerHTML = Object.entries(classMap).map(([cn,tot])=>`<div class="stat-card" style="padding:14px"><div class="stat-label">${cn}</div><div class="amount" style="font-size:1.05rem;margin-top:4px">${UI.currency(tot)}</div></div>`).join("");
+    wrap.innerHTML = payments.length
+      ? `<table class="table"><thead><tr><th>Student</th><th>Class</th><th>Purpose</th><th>Amount</th><th>Date</th><th>Status</th><th></th></tr></thead><tbody>` +
+        payments.map(p=>`<tr><td><strong>${p.student_name}</strong></td><td>${UI.badge(p.class_name,"blue")}</td><td style="color:var(--text-2)">${p.purpose}</td><td class="amount">${UI.currency(p.amount)}</td><td style="color:var(--text-3);font-size:.8rem">${UI.date(p.created_at)}</td><td>${UI.badge(p.is_confirmed?"✓ Confirmed":"Pending",p.is_confirmed?"green":"warning")}</td><td><button class="btn btn-ghost btn-sm" onclick="showBreakdown(${p.student_id},'${p.student_name.replace(/'/g,"\\'")}')" >Detail</button></td></tr>`).join("") + `</tbody></table>` : UI.empty("No payments yet");
+  } catch(e) { wrap.innerHTML = UI.empty("Failed"); }
+}
+
+async function showBreakdown(sid, name) {
+  try {
+    const data = await Api.get("/coordinator/payments/student/" + sid + (activeYear?"?year_id="+activeYear.id:""));
+    document.getElementById("bd-title").textContent = name + " — Full Summary";
+    document.getElementById("bd-body").innerHTML = `<div class="total-banner"><span style="color:var(--text-2)">Total Paid</span><span class="amount" style="font-size:1.4rem">${UI.currency(data.total_paid)}</span></div>
+      <table class="table"><thead><tr><th>Date</th><th>Purpose</th><th>Amount</th><th>Collected By</th><th>Status</th></tr></thead><tbody>` +
+      data.payments.map(p=>`<tr><td>${UI.date(p.created_at)}</td><td>${p.purpose}</td><td class="amount">${UI.currency(p.amount)}</td><td style="color:var(--text-2);font-size:.8rem">${p.collector_name}</td><td>${UI.badge(p.is_confirmed?"✓ Confirmed":"Pending",p.is_confirmed?"green":"warning")}</td></tr>`).join("") + `</tbody></table>`;
+    UI.openModal("modal-breakdown");
+  } catch(e) { Toast.error(e.message); }
+}
+
+function openChangePw(){
+  document.getElementById('changePwModal').style.display='flex';
+  ['cpCurrent','cpNew','cpConfirm'].forEach(function(id){document.getElementById(id).value='';});
+  document.getElementById('changePwError').style.display='none';
+  document.getElementById('changePwSuccess').style.display='none';
+}
+function closeChangePw(){document.getElementById('changePwModal').style.display='none';}
+async function submitChangePw(){
+  var current=document.getElementById('cpCurrent').value.trim();
+  var newPw=document.getElementById('cpNew').value.trim();
+  var confirm=document.getElementById('cpConfirm').value.trim();
+  var errEl=document.getElementById('changePwError');
+  var okEl=document.getElementById('changePwSuccess');
+  errEl.style.display='none'; okEl.style.display='none';
+  if(!current||!newPw||!confirm){errEl.textContent='All fields are required.';errEl.style.display='block';return;}
+  if(newPw.length<6){errEl.textContent='New password must be at least 6 characters.';errEl.style.display='block';return;}
+  if(newPw!==confirm){errEl.textContent='New passwords do not match.';errEl.style.display='block';return;}
+  var token=localStorage.getItem('asmap_token');
+  if(!token){window.location.href='login.html';return;}
+  try{
+    var base=(typeof API_BASE!=='undefined')?API_BASE:'http://localhost:5000/api';
+    var res=await fetch(base+'/auth/change-password',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({current_password:current,new_password:newPw})});
+    var _sd=await res.json();
+    if(res.ok){
+      okEl.textContent='Password changed successfully!';okEl.style.display='block';
+      ['cpCurrent','cpNew','cpConfirm'].forEach(function(id){document.getElementById(id).value='';});
+    }else{errEl.textContent=data.error||'Failed to change password.';errEl.style.display='block';}
+  }catch(e){errEl.textContent='Network error. Please try again.';errEl.style.display='block';}
+}
+document.addEventListener('DOMContentLoaded',function(){
+    initCoordMonitoring();
+  var modal=document.getElementById('changePwModal');
+  if(modal){modal.addEventListener('click',function(e){if(e.target===this)closeChangePw();});}
+});
+
+var coordAllTeachers=[];
+function initCoordMonitoring(){
+  var token=localStorage.getItem('asmap_token');if(!token)return;
+  var base=(typeof API_BASE!=='undefined')?API_BASE:'http://localhost:5000/api';
+  var h={'Authorization':'Bearer '+token};
+  var d=document.getElementById('monDate');if(d)d.value=new Date().toISOString().split('T')[0];
+  fetch(base+'/admin/subjects',{headers:h}).then(function(r){return r.json();}).then(function(d){
+    var sel=document.getElementById('monSubject');if(!sel)return;
+    (d.subjects||[]).forEach(function(s){var o=document.createElement('option');o.value=s.id;o.textContent=s.name;sel.appendChild(o);});
+  }).catch(function(){});
+  fetch(base+'/admin/classes',{headers:h}).then(function(r){return r.json();}).then(function(d){
+    var sel=document.getElementById('monClass');if(!sel)return;
+    (d.classes||[]).forEach(function(c){var o=document.createElement('option');o.value=c.id;o.textContent=c.name;sel.appendChild(o);});
+  }).catch(function(){});
+  fetch(base+'/admin/teachers',{headers:h}).then(function(r){return r.json();}).then(function(d){coordAllTeachers=d.teachers||[];}).catch(function(){});
+  loadCoordMonitoringRecords();
+}
+function coordSearchTeacher(query){
+  var dd=document.getElementById('coordTeacherDropdown');
+  if(!query||query.length<2){dd.innerHTML='';return;}
+  var matches=coordAllTeachers.filter(function(t){return t.full_name.toLowerCase().indexOf(query.toLowerCase())>=0;}).slice(0,8);
+  dd.style.cssText='position:relative;z-index:200;background:#0d2137;border:1px solid #1e4d7b;border-radius:4px;';
+  dd.innerHTML=matches.length?matches.map(function(t){return '<div onclick="coordSelectTeacher('+t.id+',this.dataset.name)" data-name="'+t.full_name.replace(/"/g,'&quot;')+'" style="padding:.5rem .75rem;cursor:pointer;color:#e8f4f8;font-size:.85rem;" onmouseover="this.style.background=\'#1e4d7b\'" onmouseout="this.style.background=\'\'">'+t.full_name+'</div>';}).join(''):'<div style="padding:.5rem .75rem;color:#8bb8d4;font-size:.85rem;">No match</div>';
+}
+function coordSelectTeacher(id,name){
+  document.getElementById('monTeacherId').value=id;
+  document.getElementById('monTeacherSearch').value=name;
+  document.getElementById('coordTeacherDropdown').innerHTML='';
+}
+async function coordSubmitMonitoring(){
+  var base=(typeof API_BASE!=='undefined')?API_BASE:'http://localhost:5000/api';
+  var token=localStorage.getItem('asmap_token');
+  var teacherId=document.getElementById('monTeacherId').value;
+  if(!teacherId){alert('Please select a teacher.');return;}
+  var date=document.getElementById('monDate').value;
+  if(!date){alert('Please select a date.');return;}
+  var body={teacher_id:parseInt(teacherId),subject_id:document.getElementById('monSubject').value||null,class_id:document.getElementById('monClass').value||null,attendance_date:date,session_type:document.getElementById('monSession').value,period:document.getElementById('monPeriod').value||null,time_in:document.getElementById('monTimeIn').value||null,students_present:parseInt(document.getElementById('monStudents').value)||0,notes:document.getElementById('monNotes').value};
+  try{
+    var r=await fetch(base+'/coordinator/monitoring',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify(body)});
+    var d=await r.json();
+    if(r.ok){alert('Saved!');document.getElementById('monTeacherSearch').value='';document.getElementById('monTeacherId').value='';loadCoordMonitoringRecords();}
+    else{alert('Error: '+(d.error||'Unknown'));}
+  }catch(e){alert('Network error.');}
+}
+async function loadCoordMonitoringRecords(){
+  var base=(typeof API_BASE!=='undefined')?API_BASE:'http://localhost:5000/api';
+  var token=localStorage.getItem('asmap_token');
+  var el=document.getElementById('coordMonitoringList');if(!el)return;
+  try{
+    var r=await fetch(base+'/coordinator/monitoring',{headers:{'Authorization':'Bearer '+token}});
+    var d=await r.json();var recs=d.records||[];
+    if(!recs.length){el.innerHTML='<p>No records yet.</p>';return;}
+    el.innerHTML='<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:.82rem;"><thead><tr style="color:#c9a84c;border-bottom:1px solid #1e4d7b;"><th style="padding:.5rem;text-align:left;">Date</th><th style="padding:.5rem;text-align:left;">Teacher</th><th style="padding:.5rem;text-align:left;">Period</th><th style="padding:.5rem;text-align:left;">Session</th><th style="padding:.5rem;text-align:left;">Arrived</th><th style="padding:.5rem;text-align:left;">Status</th></tr></thead><tbody>'+recs.map(function(r){return'<tr style="border-bottom:1px solid #0d2137;color:#e8f4f8;"><td style="padding:.5rem;">'+r.attendance_date+'</td><td style="padding:.5rem;">'+(r.teacher_name||'-')+'</td><td style="padding:.5rem;">'+(r.period||'-')+'</td><td style="padding:.5rem;">'+r.session_type+'</td><td style="padding:.5rem;">'+(r.time_in||'-')+'</td><td style="padding:.5rem;">'+(r.is_on_time===true?'<span style="color:#2ecc71;">On Time</span>':r.is_on_time===false?'<span style="color:#ff4444;">Late</span>':'-')+'</td></tr>';}).join('')+'</tbody></table></div>';
+  }catch(e){el.innerHTML='<p style="color:#ff4444;">Could not load records.</p>';}
+}
+async function loadCoordTeacherSummary(){
+  var base=(typeof API_BASE!=='undefined')?API_BASE:'http://localhost:5000/api';
+  var token=localStorage.getItem('asmap_token');
+  var el=document.getElementById('coordTeacherSummaryTable');if(!el)return;
+  try{
+    var r=await fetch(base+'/coordinator/teacher-summary',{headers:{'Authorization':'Bearer '+token}});
+    var d=await r.json();var rows=d.summary||[];
+    if(!rows.length){el.innerHTML='<p>No data yet.</p>';return;}
+    el.innerHTML='<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:.82rem;"><thead><tr style="color:#c9a84c;border-bottom:1px solid #1e4d7b;"><th style="padding:.5rem;text-align:left;">Teacher</th><th style="padding:.5rem;text-align:center;">Normal</th><th style="padding:.5rem;text-align:center;">On Time</th><th style="padding:.5rem;text-align:center;">Late</th><th style="padding:.5rem;text-align:center;">Extended</th><th style="padding:.5rem;text-align:center;">On Time</th><th style="padding:.5rem;text-align:center;">Late</th><th style="padding:.5rem;text-align:center;">Total</th></tr></thead><tbody>'+rows.map(function(r){return'<tr style="border-bottom:1px solid #0d2137;color:#e8f4f8;"><td style="padding:.5rem;">'+r.teacher_name+'</td><td style="padding:.5rem;text-align:center;">'+r.normal_total+'</td><td style="padding:.5rem;text-align:center;color:#2ecc71;">'+r.normal_ontime+'</td><td style="padding:.5rem;text-align:center;color:#ff4444;">'+r.normal_late+'</td><td style="padding:.5rem;text-align:center;">'+r.extended_total+'</td><td style="padding:.5rem;text-align:center;color:#2ecc71;">'+r.extended_ontime+'</td><td style="padding:.5rem;text-align:center;color:#ff4444;">'+r.extended_late+'</td><td style="padding:.5rem;text-align:center;font-weight:700;">'+r.grand_total+'</td></tr>';}).join('')+'</tbody></table></div>';
+  }catch(e){el.innerHTML='<p style="color:#ff4444;">Could not load.</p>';}
+}
+
+</script>
 </head>
 <body>
 <div class="app-shell">
@@ -155,131 +384,7 @@
 </div>
 </div>
 
-<script>
-let myClasses = []; let activeYear = null; let selectedStudentId = null;
-const sectionLoaded = {};
-const go = makeNav(sectionLoaded, {
-  overview:       loadOverview,
-  record:         loadRecordSection,
-  history:        loadHistorySection,
-  monitoring:     initCoordMonitoring,
-  teacherSummary: loadCoordTeacherSummary,
-});
 
-document.addEventListener("DOMContentLoaded", async () => {
-  if (!Auth.requireRole("coordinator")) return;
-  UI.initHamburger(); UI.initUserDisplay(); UI.loadFullBranding();
-  activeYear = await Api.get("/admin/years/active").catch(() => null);
-  if (activeYear) {
-    document.getElementById("active-year-badge").textContent = activeYear.label;
-    document.getElementById("coord-year-sub").textContent = "Academic Year " + activeYear.label;
-  } else {
-    document.getElementById("coord-year-sub").textContent = "No academic year active";
-  }
-  myClasses = await Api.get("/coordinator/classes").catch(() => []);
-  loadOverview();
-});
-
-async function loadOverview() {
-  try {
-    const _pr = await Api.get("/coordinator/payments"); const payments = _pr.payments || _pr;
-    const total = payments.reduce((s,p) => s + p.amount, 0);
-    const unconf = payments.filter(p => !p.is_confirmed).length;
-    document.getElementById("coord-stats").innerHTML = `
-      <div class="stat-card"><div class="stat-label">My Classes</div><div class="stat-value">${myClasses.length}</div><div class="stat-icon">▣</div></div>
-      <div class="stat-card"><div class="stat-label">I Collected</div><div class="stat-value" style="font-size:1.1rem">${UI.currency(total)}</div><div class="stat-icon">◇</div></div>
-      <div class="stat-card"><div class="stat-label">Pending Confirm</div><div class="stat-value" style="${unconf>0?"color:var(--warning)":""}">${unconf}</div><div class="stat-icon">◌</div></div>
-      <div class="stat-card"><div class="stat-label">Total Records</div><div class="stat-value">${payments.length}</div><div class="stat-icon">◈</div></div>`;
-    document.getElementById("overview-classes").innerHTML = myClasses.length
-      ? myClasses.map(a=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border)"><span style="font-weight:500">${a.class_name}</span><button class="btn btn-ghost btn-sm" onclick="go('record')">Collect</button></div>`).join("") : UI.empty("No classes assigned yet");
-    document.getElementById("overview-recent").innerHTML = payments.length
-      ? payments.slice(0,6).map(p=>`<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:.84rem"><div><div style="font-weight:500">${p.student_name}</div><div style="color:var(--text-3);font-size:.77rem">${p.class_name} · ${p.purpose}</div></div><div style="text-align:right"><div class="amount" style="font-size:.88rem">${UI.currency(p.amount)}</div><div>${UI.badge(p.is_confirmed?"✓":"Pending",p.is_confirmed?"green":"warning")}</div></div></div>`).join("") : UI.empty("No payments yet");
-  } catch(e) { Toast.error(e.message); }
-}
-
-async function loadRecordSection() {
-  UI.populateSelect("rec-class", myClasses, "class_id", "class_name", "Choose class…");
-}
-
-async function loadRecordStudents() {
-  const cid = document.getElementById("rec-class").value;
-  const list = document.getElementById("rec-students-list");
-  list.innerHTML = ""; selectedStudentId = null;
-  document.getElementById("submit-btn").disabled = true;
-  document.getElementById("selected-student-banner").style.display = "none";
-  if (!cid) return;
-  list.innerHTML = UI.loading();
-  try {
-    const students = await Api.get("/coordinator/students/" + cid + (activeYear?"?year_id="+activeYear.id:""));
-    list.innerHTML = students.length
-      ? students.map(s=>`<div class="student-card" id="sc-${s.id}" onclick="selectStudent(${s.id},'${s.student_name.replace(/'/g,"\\'")}')" ><span style="font-weight:500">${s.student_name}</span><span style="font-size:.77rem;color:var(--text-3)">Tap to select</span></div>`).join("") : UI.empty("No students in this class");
-  } catch(e) { list.innerHTML = UI.empty("Failed to load"); }
-}
-
-async function selectStudent(id, name) {
-  document.querySelectorAll(".student-card").forEach(c => c.classList.remove("selected"));
-  document.getElementById("sc-"+id)?.classList.add("selected");
-  selectedStudentId = id;
-  document.getElementById("submit-btn").disabled = false;
-  document.getElementById("selected-name").textContent = name;
-  document.getElementById("selected-total").textContent = "Loading…";
-  document.getElementById("selected-student-banner").style.display = "flex";
-  try {
-    const data = await Api.get("/coordinator/payments/student/" + id + (activeYear?"?year_id="+activeYear.id:""));
-    document.getElementById("selected-total").textContent = UI.currency(data.total_paid);
-  } catch(e) { document.getElementById("selected-total").textContent = "—"; }
-}
-
-async function recordPayment() {
-  if (!selectedStudentId) { Toast.error("Select a student first"); return; }
-  const amount  = document.getElementById("rec-amount").value;
-  const purpose = document.getElementById("rec-purpose").value;
-  const notes   = document.getElementById("rec-notes").value;
-  if (!amount || !purpose) { Toast.error("Amount and purpose required"); return; }
-  if (parseFloat(amount) <= 0) { Toast.error("Amount must be greater than 0"); return; }
-  const btn = document.getElementById("submit-btn");
-  btn.disabled = true; btn.textContent = "Saving…";
-  try {
-    await Api.post("/coordinator/payments", {student_id:selectedStudentId, amount:parseFloat(amount), purpose, notes});
-    Toast.success("Payment recorded — awaiting admin confirmation");
-    document.getElementById("rec-amount").value = "";
-    document.getElementById("rec-purpose").value = "";
-    document.getElementById("rec-notes").value = "";
-    selectStudent(selectedStudentId, document.getElementById("selected-name").textContent);
-    delete sectionLoaded["history"]; loadOverview();
-  } catch(e) { Toast.error(e.message); } finally { btn.disabled=false; btn.textContent="Submit Payment"; }
-}
-
-async function loadHistorySection() {
-  UI.populateSelect("hist-class", myClasses, "class_id", "class_name", "All My Classes");
-  loadHistory();
-}
-
-async function loadHistory() {
-  const wrap = document.getElementById("hist-table-wrap"); wrap.innerHTML = UI.loading();
-  const cid  = document.getElementById("hist-class")?.value || "";
-  try {
-    const payments = await Api.get("/coordinator/payments" + (cid?"?class_id="+cid:""));
-    const classMap = {};
-    payments.forEach(p => { if (!classMap[p.class_name]) classMap[p.class_name] = 0; classMap[p.class_name] += p.amount; });
-    document.getElementById("hist-totals").innerHTML = Object.entries(classMap).map(([cn,tot])=>`<div class="stat-card" style="padding:14px"><div class="stat-label">${cn}</div><div class="amount" style="font-size:1.05rem;margin-top:4px">${UI.currency(tot)}</div></div>`).join("");
-    wrap.innerHTML = payments.length
-      ? `<table class="table"><thead><tr><th>Student</th><th>Class</th><th>Purpose</th><th>Amount</th><th>Date</th><th>Status</th><th></th></tr></thead><tbody>` +
-        payments.map(p=>`<tr><td><strong>${p.student_name}</strong></td><td>${UI.badge(p.class_name,"blue")}</td><td style="color:var(--text-2)">${p.purpose}</td><td class="amount">${UI.currency(p.amount)}</td><td style="color:var(--text-3);font-size:.8rem">${UI.date(p.created_at)}</td><td>${UI.badge(p.is_confirmed?"✓ Confirmed":"Pending",p.is_confirmed?"green":"warning")}</td><td><button class="btn btn-ghost btn-sm" onclick="showBreakdown(${p.student_id},'${p.student_name.replace(/'/g,"\\'")}')" >Detail</button></td></tr>`).join("") + `</tbody></table>` : UI.empty("No payments yet");
-  } catch(e) { wrap.innerHTML = UI.empty("Failed"); }
-}
-
-async function showBreakdown(sid, name) {
-  try {
-    const data = await Api.get("/coordinator/payments/student/" + sid + (activeYear?"?year_id="+activeYear.id:""));
-    document.getElementById("bd-title").textContent = name + " — Full Summary";
-    document.getElementById("bd-body").innerHTML = `<div class="total-banner"><span style="color:var(--text-2)">Total Paid</span><span class="amount" style="font-size:1.4rem">${UI.currency(data.total_paid)}</span></div>
-      <table class="table"><thead><tr><th>Date</th><th>Purpose</th><th>Amount</th><th>Collected By</th><th>Status</th></tr></thead><tbody>` +
-      data.payments.map(p=>`<tr><td>${UI.date(p.created_at)}</td><td>${p.purpose}</td><td class="amount">${UI.currency(p.amount)}</td><td style="color:var(--text-2);font-size:.8rem">${p.collector_name}</td><td>${UI.badge(p.is_confirmed?"✓ Confirmed":"Pending",p.is_confirmed?"green":"warning")}</td></tr>`).join("") + `</tbody></table>`;
-    UI.openModal("modal-breakdown");
-  } catch(e) { Toast.error(e.message); }
-}
-</script>
 
 <!-- CHANGE PASSWORD MODAL -->
 <div id="changePwModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:9999; align-items:center; justify-content:center;">
@@ -299,113 +404,11 @@ async function showBreakdown(sid, name) {
     </div>
   </div>
 </div>
-<script>
-function openChangePw(){
-  document.getElementById('changePwModal').style.display='flex';
-  ['cpCurrent','cpNew','cpConfirm'].forEach(function(id){document.getElementById(id).value='';});
-  document.getElementById('changePwError').style.display='none';
-  document.getElementById('changePwSuccess').style.display='none';
-}
-function closeChangePw(){document.getElementById('changePwModal').style.display='none';}
-async function submitChangePw(){
-  var current=document.getElementById('cpCurrent').value.trim();
-  var newPw=document.getElementById('cpNew').value.trim();
-  var confirm=document.getElementById('cpConfirm').value.trim();
-  var errEl=document.getElementById('changePwError');
-  var okEl=document.getElementById('changePwSuccess');
-  errEl.style.display='none'; okEl.style.display='none';
-  if(!current||!newPw||!confirm){errEl.textContent='All fields are required.';errEl.style.display='block';return;}
-  if(newPw.length<6){errEl.textContent='New password must be at least 6 characters.';errEl.style.display='block';return;}
-  if(newPw!==confirm){errEl.textContent='New passwords do not match.';errEl.style.display='block';return;}
-  var token=localStorage.getItem('asmap_token');
-  if(!token){window.location.href='login.html';return;}
-  try{
-    var base=(typeof API_BASE!=='undefined')?API_BASE:'http://localhost:5000/api';
-    var res=await fetch(base+'/auth/change-password',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({current_password:current,new_password:newPw})});
-    var _sd=await res.json();
-    if(res.ok){
-      okEl.textContent='Password changed successfully!';okEl.style.display='block';
-      ['cpCurrent','cpNew','cpConfirm'].forEach(function(id){document.getElementById(id).value='';});
-    }else{errEl.textContent=data.error||'Failed to change password.';errEl.style.display='block';}
-  }catch(e){errEl.textContent='Network error. Please try again.';errEl.style.display='block';}
-}
-document.addEventListener('DOMContentLoaded',function(){
-    initCoordMonitoring();
-  var modal=document.getElementById('changePwModal');
-  if(modal){modal.addEventListener('click',function(e){if(e.target===this)closeChangePw();});}
-});
-</script>
+
 
 <!-- COORDINATOR MONITORING SECTION -->
 
 </div>
-<script>
-var coordAllTeachers=[];
-function initCoordMonitoring(){
-  var token=localStorage.getItem('asmap_token');if(!token)return;
-  var base=(typeof API_BASE!=='undefined')?API_BASE:'http://localhost:5000/api';
-  var h={'Authorization':'Bearer '+token};
-  var d=document.getElementById('monDate');if(d)d.value=new Date().toISOString().split('T')[0];
-  fetch(base+'/admin/subjects',{headers:h}).then(function(r){return r.json();}).then(function(d){
-    var sel=document.getElementById('monSubject');if(!sel)return;
-    (d.subjects||[]).forEach(function(s){var o=document.createElement('option');o.value=s.id;o.textContent=s.name;sel.appendChild(o);});
-  }).catch(function(){});
-  fetch(base+'/admin/classes',{headers:h}).then(function(r){return r.json();}).then(function(d){
-    var sel=document.getElementById('monClass');if(!sel)return;
-    (d.classes||[]).forEach(function(c){var o=document.createElement('option');o.value=c.id;o.textContent=c.name;sel.appendChild(o);});
-  }).catch(function(){});
-  fetch(base+'/admin/teachers',{headers:h}).then(function(r){return r.json();}).then(function(d){coordAllTeachers=d.teachers||[];}).catch(function(){});
-  loadCoordMonitoringRecords();
-}
-function coordSearchTeacher(query){
-  var dd=document.getElementById('coordTeacherDropdown');
-  if(!query||query.length<2){dd.innerHTML='';return;}
-  var matches=coordAllTeachers.filter(function(t){return t.full_name.toLowerCase().indexOf(query.toLowerCase())>=0;}).slice(0,8);
-  dd.style.cssText='position:relative;z-index:200;background:#0d2137;border:1px solid #1e4d7b;border-radius:4px;';
-  dd.innerHTML=matches.length?matches.map(function(t){return '<div onclick="coordSelectTeacher('+t.id+',this.dataset.name)" data-name="'+t.full_name.replace(/"/g,'&quot;')+'" style="padding:.5rem .75rem;cursor:pointer;color:#e8f4f8;font-size:.85rem;" onmouseover="this.style.background=\'#1e4d7b\'" onmouseout="this.style.background=\'\'">'+t.full_name+'</div>';}).join(''):'<div style="padding:.5rem .75rem;color:#8bb8d4;font-size:.85rem;">No match</div>';
-}
-function coordSelectTeacher(id,name){
-  document.getElementById('monTeacherId').value=id;
-  document.getElementById('monTeacherSearch').value=name;
-  document.getElementById('coordTeacherDropdown').innerHTML='';
-}
-async function coordSubmitMonitoring(){
-  var base=(typeof API_BASE!=='undefined')?API_BASE:'http://localhost:5000/api';
-  var token=localStorage.getItem('asmap_token');
-  var teacherId=document.getElementById('monTeacherId').value;
-  if(!teacherId){alert('Please select a teacher.');return;}
-  var date=document.getElementById('monDate').value;
-  if(!date){alert('Please select a date.');return;}
-  var body={teacher_id:parseInt(teacherId),subject_id:document.getElementById('monSubject').value||null,class_id:document.getElementById('monClass').value||null,attendance_date:date,session_type:document.getElementById('monSession').value,period:document.getElementById('monPeriod').value||null,time_in:document.getElementById('monTimeIn').value||null,students_present:parseInt(document.getElementById('monStudents').value)||0,notes:document.getElementById('monNotes').value};
-  try{
-    var r=await fetch(base+'/coordinator/monitoring',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify(body)});
-    var d=await r.json();
-    if(r.ok){alert('Saved!');document.getElementById('monTeacherSearch').value='';document.getElementById('monTeacherId').value='';loadCoordMonitoringRecords();}
-    else{alert('Error: '+(d.error||'Unknown'));}
-  }catch(e){alert('Network error.');}
-}
-async function loadCoordMonitoringRecords(){
-  var base=(typeof API_BASE!=='undefined')?API_BASE:'http://localhost:5000/api';
-  var token=localStorage.getItem('asmap_token');
-  var el=document.getElementById('coordMonitoringList');if(!el)return;
-  try{
-    var r=await fetch(base+'/coordinator/monitoring',{headers:{'Authorization':'Bearer '+token}});
-    var d=await r.json();var recs=d.records||[];
-    if(!recs.length){el.innerHTML='<p>No records yet.</p>';return;}
-    el.innerHTML='<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:.82rem;"><thead><tr style="color:#c9a84c;border-bottom:1px solid #1e4d7b;"><th style="padding:.5rem;text-align:left;">Date</th><th style="padding:.5rem;text-align:left;">Teacher</th><th style="padding:.5rem;text-align:left;">Period</th><th style="padding:.5rem;text-align:left;">Session</th><th style="padding:.5rem;text-align:left;">Arrived</th><th style="padding:.5rem;text-align:left;">Status</th></tr></thead><tbody>'+recs.map(function(r){return'<tr style="border-bottom:1px solid #0d2137;color:#e8f4f8;"><td style="padding:.5rem;">'+r.attendance_date+'</td><td style="padding:.5rem;">'+(r.teacher_name||'-')+'</td><td style="padding:.5rem;">'+(r.period||'-')+'</td><td style="padding:.5rem;">'+r.session_type+'</td><td style="padding:.5rem;">'+(r.time_in||'-')+'</td><td style="padding:.5rem;">'+(r.is_on_time===true?'<span style="color:#2ecc71;">On Time</span>':r.is_on_time===false?'<span style="color:#ff4444;">Late</span>':'-')+'</td></tr>';}).join('')+'</tbody></table></div>';
-  }catch(e){el.innerHTML='<p style="color:#ff4444;">Could not load records.</p>';}
-}
-async function loadCoordTeacherSummary(){
-  var base=(typeof API_BASE!=='undefined')?API_BASE:'http://localhost:5000/api';
-  var token=localStorage.getItem('asmap_token');
-  var el=document.getElementById('coordTeacherSummaryTable');if(!el)return;
-  try{
-    var r=await fetch(base+'/coordinator/teacher-summary',{headers:{'Authorization':'Bearer '+token}});
-    var d=await r.json();var rows=d.summary||[];
-    if(!rows.length){el.innerHTML='<p>No data yet.</p>';return;}
-    el.innerHTML='<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:.82rem;"><thead><tr style="color:#c9a84c;border-bottom:1px solid #1e4d7b;"><th style="padding:.5rem;text-align:left;">Teacher</th><th style="padding:.5rem;text-align:center;">Normal</th><th style="padding:.5rem;text-align:center;">On Time</th><th style="padding:.5rem;text-align:center;">Late</th><th style="padding:.5rem;text-align:center;">Extended</th><th style="padding:.5rem;text-align:center;">On Time</th><th style="padding:.5rem;text-align:center;">Late</th><th style="padding:.5rem;text-align:center;">Total</th></tr></thead><tbody>'+rows.map(function(r){return'<tr style="border-bottom:1px solid #0d2137;color:#e8f4f8;"><td style="padding:.5rem;">'+r.teacher_name+'</td><td style="padding:.5rem;text-align:center;">'+r.normal_total+'</td><td style="padding:.5rem;text-align:center;color:#2ecc71;">'+r.normal_ontime+'</td><td style="padding:.5rem;text-align:center;color:#ff4444;">'+r.normal_late+'</td><td style="padding:.5rem;text-align:center;">'+r.extended_total+'</td><td style="padding:.5rem;text-align:center;color:#2ecc71;">'+r.extended_ontime+'</td><td style="padding:.5rem;text-align:center;color:#ff4444;">'+r.extended_late+'</td><td style="padding:.5rem;text-align:center;font-weight:700;">'+r.grand_total+'</td></tr>';}).join('')+'</tbody></table></div>';
-  }catch(e){el.innerHTML='<p style="color:#ff4444;">Could not load.</p>';}
-}
-</script>
+
 </body>
 </html>
