@@ -193,7 +193,7 @@ def dashboard():
         'total_monitoring':    m_query.count(),
         'payment_count':       p_query.count(),
         'purpose_breakdown':   [{'purpose': r.purpose, 'total': float(r.t), 'count': r.c} for r in purpose_rows],
-        'class_breakdown':     [{'class_name': r.class_name, 'total': float(r.t), 'count': r.c} for r in class_rows],
+        'class_breakdown':     [{'class_name': r.name, 'total': float(r.t), 'count': r.c} for r in class_rows],
     })
 
 
@@ -253,7 +253,7 @@ def update_user(uid):
 @admin_bp.route('/teachers', methods=['GET'])
 @jwt_required()
 def list_teachers():
-    teachers = Teacher.query.filter_by(is_active=True).order_by(Teacher.teacher_name).all()
+    teachers = Teacher.query.filter_by(is_active=True).order_by(Teacher.full_name).all()
     return jsonify([t.to_dict() for t in teachers])
 
 
@@ -261,11 +261,11 @@ def list_teachers():
 @admin_required
 def create_teacher():
     data = request.get_json(silent=True) or {}
-    name = (data.get('teacher_name') or '').strip()
+    name = (data.get('full_name') or '').strip()
     if not name:
         return jsonify({'error': 'Teacher name required'}), 400
     t = Teacher(
-        teacher_name=name,
+        full_name=name,
         subject=(data.get('subject') or '').strip() or None,
         created_by=get_jwt_identity()
     )
@@ -279,7 +279,7 @@ def create_teacher():
 def update_teacher(tid):
     t = Teacher.query.get_or_404(tid)
     data = request.get_json(silent=True) or {}
-    if 'teacher_name' in data: t.teacher_name = data['teacher_name'].strip()
+    if 'full_name' in data: t.full_name = data['full_name'].strip()
     if 'subject'      in data: t.subject      = data['subject'].strip() or None
     if 'is_active'    in data: t.is_active    = data['is_active']
     db.session.commit()
@@ -299,7 +299,7 @@ def delete_teacher(tid):
 @admin_bp.route('/subjects', methods=['GET'])
 @jwt_required()
 def list_subjects():
-    return jsonify([s.to_dict() for s in Subject.query.order_by(Subject.subject_name).all()])
+    return jsonify([s.to_dict() for s in Subject.query.order_by(Subject.name).all()])
 
 
 @admin_bp.route('/subjects', methods=['POST'])
@@ -309,9 +309,9 @@ def create_subject():
     name = (data.get('subject_name') or '').strip()
     if not name:
         return jsonify({'error': 'Subject name required'}), 400
-    if Subject.query.filter_by(subject_name=name).first():
+    if Subject.query.filter_by(name=name).first():
         return jsonify({'error': 'Subject already exists'}), 409
-    s = Subject(subject_name=name, created_by=get_jwt_identity())
+    s = Subject(name=name, created_by=get_jwt_identity())
     db.session.add(s)
     db.session.commit()
     return jsonify(s.to_dict()), 201
@@ -340,9 +340,9 @@ def create_class():
     name = (data.get('class_name') or '').strip()
     if not name:
         return jsonify({'error': 'Class name required'}), 400
-    if Class.query.filter_by(class_name=name).first():
+    if Class.query.filter_by(name=name).first():
         return jsonify({'error': 'Class already exists'}), 409
-    c = Class(class_name=name, created_by=get_jwt_identity())
+    c = Class(name=name, created_by=get_jwt_identity())
     db.session.add(c)
     db.session.commit()
     return jsonify(c.to_dict()), 201
@@ -390,7 +390,7 @@ def create_student():
 def update_student(sid):
     s = Student.query.get_or_404(sid)
     data = request.get_json(silent=True) or {}
-    if 'student_name' in data: s.student_name = data['student_name'].strip()
+    if 'student_name' in data: s.name = data['student_name'].strip()
     if 'class_id'     in data: s.class_id     = int(data['class_id'])
     if 'is_active'    in data: s.is_active    = data['is_active']
     db.session.commit()
@@ -421,9 +421,9 @@ def import_students():
             errors.append(f'Row {i}: missing name or class')
             continue
 
-        cls = Class.query.filter_by(class_name=cname).first()
+        cls = Class.query.filter_by(name=cname).first()
         if not cls:
-            cls = Class(class_name=cname, created_by=creator_id)
+            cls = Class(name=cname, created_by=creator_id)
             db.session.add(cls)
             db.session.flush()
 
@@ -471,7 +471,7 @@ def export_students():
     q = Student.query.filter_by(is_active=True)
     if year_id: q = q.filter_by(academic_year_id=int(year_id))
     for s in q.order_by(Student.student_name).all():
-        ws.append([s.student_name, s.class_.class_name if s.class_ else '',
+        ws.append([s.name, s.class_.name if s.class_ else '',
                    s.academic_year.label if s.academic_year else ''])
 
     for col, w in [('A', 35), ('B', 20), ('C', 15)]:
@@ -635,7 +635,7 @@ def payment_reports():
 
     return jsonify({
         'grand_total':   grand,
-        'by_class':      [{'class_id': r.cid, 'class_name': r.class_name, 'total': float(r.t), 'count': r.c} for r in by_class],
+        'by_class':      [{'class_id': r.cid, 'class_name': r.name, 'total': float(r.t), 'count': r.c} for r in by_class],
         'by_purpose':    [{'purpose': r.purpose, 'total': float(r.t), 'count': r.c} for r in by_purpose],
         'by_collector':  [{'name': r.full_name or r.username, 'total': float(r.t), 'count': r.c} for r in by_collector],
     })
@@ -663,7 +663,7 @@ def export_payment_report():
     for p in q.order_by(Payment.created_at.desc()).all():
         ws1.append([
             p.student.student_name if p.student else '',
-            p.student.class_.class_name if p.student and p.student.class_ else '',
+            p.student.class_.name if p.student and p.student.class_ else '',
             p.purpose, float(p.amount),
             (p.collector.full_name or p.collector.username) if p.collector else '',
             'Yes' if p.is_confirmed else 'No',
@@ -724,13 +724,13 @@ def list_monitoring():
 @admin_required
 def teacher_summary():
     year_id = request.args.get('year_id') or _active_year_id()
-    q = (db.session.query(Teacher.id, Teacher.teacher_name, Teacher.subject,
+    q = (db.session.query(Teacher.id, Teacher.full_name, Teacher.subject,
                           func.count(MonitoringRecord.id).label('sessions'),
                           func.sum(MonitoringRecord.students_present).label('students'))
          .join(MonitoringRecord, MonitoringRecord.teacher_id == Teacher.id))
     if year_id: q = q.filter(MonitoringRecord.academic_year_id == int(year_id))
     rows = q.group_by(Teacher.id).order_by(func.count(MonitoringRecord.id).desc()).all()
-    return jsonify([{'teacher_id': r.id, 'teacher_name': r.teacher_name,
+    return jsonify([{'teacher_id': r.id, 'full_name': r.full_name,
                      'subject': r.subject or '', 'total_sessions': r.sessions,
                      'total_students': int(r.students or 0)} for r in rows])
 
@@ -744,7 +744,7 @@ def teacher_evaluation_report():
     This drives the remuneration analysis.
     """
     year_id = request.args.get('year_id') or _active_year_id()
-    teachers = Teacher.query.filter_by(is_active=True).order_by(Teacher.teacher_name).all()
+    teachers = Teacher.query.filter_by(is_active=True).order_by(Teacher.full_name).all()
 
     def stats(teacher_id, session_type):
         q = MonitoringRecord.query.filter_by(teacher_id=teacher_id, session_type=session_type)
@@ -765,7 +765,7 @@ def teacher_evaluation_report():
         if normal['sessions'] > 0 or extended['sessions'] > 0:
             result.append({
                 'teacher_id':   t.id,
-                'teacher_name': t.teacher_name,
+                'full_name': t.full_name,
                 'subject':      t.subject or '',
                 'normal':       normal,
                 'extended':     extended,
@@ -1008,5 +1008,6 @@ def get_teacher_subjects(teacher_id):
 
     teacher = Teacher.query.get_or_404(teacher_id)
     return jsonify({'subjects': [s.to_dict() for s in teacher.subjects]})
+
 
 
