@@ -706,7 +706,7 @@ function editPeriod(id,name,start,end,session){
 async function deletePeriod(id){
   if(!confirm("Delete this period?")) return;
   try {
-    await Api.delete("/admin/periods/"+id);
+    await Api.del("/admin/periods/"+id);
     Toast.success("Period deleted");
     delete sectionLoaded["setup"]; loadSetup();
   } catch(e){ Toast.error(e.message); }
