@@ -692,7 +692,7 @@ function editPeriod(id,name,start,end,session){
   document.getElementById("add-period-form").style.display="block";
 }
 
-async async function deletePeriod(id){
+async function deletePeriod(id){
   if(!confirm("Delete this period?")) return;
   try {
     await Api.del("/admin/periods/"+id);
@@ -717,7 +717,7 @@ async function importSubjects(input) {
 }
 
 
-async async function downloadTeacherTemplate() {
+async function downloadTeacherTemplate() {
   var base = (typeof API_BASE !== 'undefined') ? API_BASE : 'http://localhost:5000/api';
   var token = localStorage.getItem('asmap_token');
   var r = await fetch(base + '/admin/teachers/template', {headers: {'Authorization': 'Bearer ' + token}});
@@ -748,7 +748,7 @@ async function uploadTeacherImport(input) {
 }
 
 
-async async function importClasses(input) {
+async function importClasses(input) {
   const file = input.files[0];
   if (!file) return;
   const fd = new FormData();
@@ -813,7 +813,7 @@ function editPeriod(id,name,start,end,session){
   document.getElementById("add-period-form").style.display="block";
 }
 
-async async function deletePeriod(id){
+async function deletePeriod(id){
   if(!confirm("Delete this period?")) return;
   try {
     await Api.delete("/admin/periods/"+id);
