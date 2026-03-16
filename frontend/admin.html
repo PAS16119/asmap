@@ -311,49 +311,34 @@
 
 <!-- TEACHER MODAL -->
 <div id="modal-teacher" class="modal-overlay">
-  <div class="modal"><div class="modal-header"><span class="modal-title">
-<!-- TEACHER BULK IMPORT PANEL -->
-<div class="card" id="teacherImportCard" style="margin-bottom:1rem;">
-  <h3 style="color:#c9a84c; margin:0 0 .75rem; font-size:.95rem;">&#128229; Bulk Import Teachers from Excel</h3>
-  <p style="color:#8bb8d4; font-size:.82rem; margin-bottom:.75rem;">Excel columns required: <strong>Full Name</strong> | <strong>Staff ID</strong> (optional) | <strong>Primary Subject</strong></p>
-  <div style="display:flex; gap:.75rem; flex-wrap:wrap; align-items:center;">
-    <a href="#" onclick="downloadTeacherTemplate(); return false;" style="padding:.55rem 1rem; background:#1e4d7b; color:#fff; border-radius:6px; text-decoration:none; font-size:.85rem; cursor:pointer;">&#11015; Download Template</a>
-    <label style="padding:.55rem 1rem; background:#2d6a2d; color:#fff; border-radius:6px; cursor:pointer; font-size:.85rem;">
-      &#128194; Upload Excel
-      <input type="file" id="teacherImportFile" accept=".xlsx,.xls" style="display:none" onchange="uploadTeacherImport(this)" />
-    </label>
-    <span id="teacherImportStatus" style="color:#8bb8d4; font-size:.85rem;"></span>
-  </div>
-</div>
-<script>
-async function downloadTeacherTemplate(){
-  var base=(typeof API_BASE!=='undefined')?API_BASE:'http://localhost:5000/api';
-  var token=localStorage.getItem('asmap_token');
-  var r=await fetch(base+'/admin/teachers/template',{headers:{'Authorization':'Bearer '+token}});
-  if(!r.ok){alert('Could not download template');return;}
-  var blob=await r.blob();var url=URL.createObjectURL(blob);
-  var a=document.createElement('a');a.href=url;a.download='teachers_template.xlsx';a.click();URL.revokeObjectURL(url);
-}
-async function uploadTeacherImport(input){
-  var file=input.files[0];var status=document.getElementById('teacherImportStatus');
-  if(!file)return;status.textContent='Uploading...';status.style.color='#c9a84c';
-  var base=(typeof API_BASE!=='undefined')?API_BASE:'http://localhost:5000/api';
-  var token=localStorage.getItem('asmap_token');
-  var fd=new FormData();fd.append('file',file);
-  try{
-    var r=await fetch(base+'/admin/teachers/import',{method:'POST',headers:{'Authorization':'Bearer '+token},body:fd});
-    var d=await r.json();
-    if(r.ok){status.textContent='Done: '+d.message;status.style.color='#2ecc71';if(typeof loadTeachers==='function')loadTeachers();}
-    else{status.textContent='Error: '+(d.error||'Import failed');status.style.color='#ff4444';}
-  }catch(e){status.textContent='Network error';status.style.color='#ff4444';}
-  input.value='';
-}
-</script>
-
-Add Teacher</span><button class="modal-close" onclick="UI.closeModal('modal-teacher')">✕</button></div>
-  <div class="form-row"><div class="form-group"><label class="form-label">Full Name *</label><input type="text" class="form-control" id="teacher-name" placeholder="e.g. Mr. Kofi Asante"></div>
-  <div class="form-group"><label class="form-label">Main Subject</label><select class="form-select" id="teacher-subject-sel"><option value="">Select subject…</option></select></div></div>
-  <div class="modal-footer"><button class="btn btn-ghost" onclick="UI.closeModal('modal-teacher')">Cancel</button><button class="btn btn-primary" onclick="saveTeacher()">Add Teacher</button></div>
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <span class="modal-title">Add Teacher</span>
+      <button class="modal-close" onclick="UI.closeModal('modal-teacher')">✕</button>
+    </div>
+    <!-- Bulk Import Panel -->
+    <div style="background:var(--bg-2);border-radius:8px;padding:14px;margin-bottom:16px">
+      <div style="color:var(--gold);font-size:.9rem;font-weight:600;margin-bottom:6px">&#128229; Bulk Import from Excel</div>
+      <div style="color:var(--text-3);font-size:.8rem;margin-bottom:10px">Columns: <strong>Full Name</strong> | Staff ID (optional) | Primary Subject</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <a href="#" onclick="downloadTeacherTemplate();return false;" class="btn btn-ghost btn-sm">&#11015; Download Template</a>
+        <label class="btn btn-ghost btn-sm" style="cursor:pointer">
+          &#128194; Upload Excel
+          <input type="file" id="teacherImportFile" accept=".xlsx,.xls" style="display:none" onchange="uploadTeacherImport(this)">
+        </label>
+        <span id="teacherImportStatus" style="font-size:.82rem;color:var(--text-3)"></span>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div style="font-size:.85rem;color:var(--text-2);margin-bottom:12px">Or add a single teacher manually:</div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Full Name *</label><input type="text" class="form-control" id="teacher-name" placeholder="e.g. Mr. Kofi Asante"></div>
+      <div class="form-group"><label class="form-label">Main Subject</label><select class="form-select" id="teacher-subject-sel"><option value="">Select subject…</option></select></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="UI.closeModal('modal-teacher')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveTeacher()">Add Teacher</button>
+    </div>
   </div>
 </div>
 
@@ -725,6 +710,37 @@ async function importSubjects(input) {
     delete sectionLoaded['setup'];
     loadSetup();
   } catch(e) { Toast.error(e.message); }
+}
+
+
+async function downloadTeacherTemplate() {
+  var base = (typeof API_BASE !== 'undefined') ? API_BASE : 'http://localhost:5000/api';
+  var token = localStorage.getItem('asmap_token');
+  var r = await fetch(base + '/admin/teachers/template', {headers: {'Authorization': 'Bearer ' + token}});
+  if (!r.ok) { Toast.error('Could not download template'); return; }
+  var blob = await r.blob();
+  UI.downloadBlob(blob, 'teachers_template.xlsx');
+}
+
+async function uploadTeacherImport(input) {
+  const file = input.files[0];
+  const status = document.getElementById('teacherImportStatus');
+  if (!file) return;
+  status.textContent = 'Uploading...';
+  status.style.color = 'var(--gold)';
+  const fd = new FormData();
+  fd.append('file', file);
+  input.value = '';
+  try {
+    const data = await Api.upload('/admin/teachers/import', fd);
+    status.textContent = 'Done: ' + (data.message || (data.created + ' added'));
+    status.style.color = 'var(--success, #2ecc71)';
+    delete sectionLoaded['setup'];
+    loadSetup();
+  } catch(e) {
+    status.textContent = 'Error: ' + e.message;
+    status.style.color = 'var(--danger)';
+  }
 }
 
 async function loadLookupStudents() {
