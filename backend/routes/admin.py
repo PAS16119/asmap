@@ -1027,38 +1027,7 @@ def export_teachers():
 
 
 # â”€â”€ POST /admin/classes/import  â€” bulk class creation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-@admin_bp.route('/classes/import', methods=['POST'])
-@jwt_required()
-def import_classes():
-    """Accept a list of class names in JSON body: { "names": ["SHS1A", "SHS1B", ...] }"""
-    claims = get_jwt()
-    if claims.get('role') != 'admin':
-        return jsonify({'error': 'Admin only'}), 403
 
-    data = request.get_json(silent=True) or {}
-    names = data.get('names', [])
-    if not names:
-        return jsonify({'error': 'Provide a list of class names'}), 400
-
-    created = 0
-    skipped = 0
-    for name in names:
-        name = str(name).strip()
-        if not name:
-            continue
-        existing = Class.query.filter(db.func.lower(Class.name) == name.lower()).first()
-        if existing:
-            skipped += 1
-            continue
-        db.session.add(Class(name=name))
-        created += 1
-
-    db.session.commit()
-    return jsonify({'message': f'{created} classes created, {skipped} already existed',
-                    'created': created, 'skipped': skipped})
-
-
-# â”€â”€ POST /admin/teachers/<id>/subjects  â€” assign multiple subjects to teacher â”€
 @admin_bp.route('/teachers/<int:teacher_id>/subjects', methods=['POST'])
 @jwt_required()
 def set_teacher_subjects(teacher_id):
