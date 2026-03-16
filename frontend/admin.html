@@ -664,7 +664,7 @@ async function expandReport(type, value, id) {
 }
 
 
-async function savePeriod() {
+// period already defined {
   const id = document.getElementById("period-edit-id").value;
   const body = {
     name: document.getElementById("period-name").value.trim(),
@@ -692,7 +692,7 @@ function editPeriod(id,name,start,end,session){
   document.getElementById("add-period-form").style.display="block";
 }
 
-async function deletePeriod(id){
+async async function deletePeriod(id){
   if(!confirm("Delete this period?")) return;
   try {
     await Api.del("/admin/periods/"+id);
@@ -717,7 +717,7 @@ async function importSubjects(input) {
 }
 
 
-async function downloadTeacherTemplate() {
+async async function downloadTeacherTemplate() {
   var base = (typeof API_BASE !== 'undefined') ? API_BASE : 'http://localhost:5000/api';
   var token = localStorage.getItem('asmap_token');
   var r = await fetch(base + '/admin/teachers/template', {headers: {'Authorization': 'Bearer ' + token}});
@@ -748,7 +748,7 @@ async function uploadTeacherImport(input) {
 }
 
 
-async function importClasses(input) {
+async async function importClasses(input) {
   const file = input.files[0];
   if (!file) return;
   const fd = new FormData();
@@ -760,6 +760,66 @@ async function importClasses(input) {
     delete sectionLoaded['setup'];
     loadSetup();
   } catch(e) { Toast.error(e.message); }
+}
+
+
+async function expandReport(type, value, id) {
+  const yp = activeYear ? "?year_id=" + activeYear.id : "";
+  const elId = type==="class" ? "expand-class-"+id : "expand-purpose-"+value.replace(/ /g,"-");
+  const el = document.getElementById(elId);
+  if (!el) return;
+  if (el.style.display !== "none") { el.style.display="none"; return; }
+  el.style.display="block";
+  el.innerHTML = "<div style='color:var(--text-3);font-size:.8rem;padding:8px'>Loading...</div>";
+  try {
+    let url = "/admin/payments" + (yp||"?");
+    if(type==="class") url += (yp?"&":"?") + "class_id="+id;
+    else url += (yp?"&":"?") + "purpose="+encodeURIComponent(value);
+    const data = await Api.get(url);
+    const payments = data.payments || data;
+    if(!payments.length){ el.innerHTML="<div style='color:var(--text-3);font-size:.8rem;padding:8px'>No records found</div>"; return; }
+    el.innerHTML = "<table class='table' style='font-size:.8rem;margin-top:4px'><thead><tr><th>Student</th><th>Purpose</th><th>Amount</th><th>Date</th><th>Status</th></tr></thead><tbody>"+
+      payments.map(p=>`<tr><td>${p.student_name}</td><td>${p.purpose}</td><td class="amount">${UI.currency(p.amount)}</td><td style="color:var(--text-3)">${UI.date(p.created_at)}</td><td>${UI.badge(p.is_confirmed?"Confirmed":"Pending",p.is_confirmed?"green":"warning")}</td></tr>`).join("")+
+      "</tbody></table>";
+  } catch(e) { el.innerHTML="<div style='color:red;font-size:.8rem;padding:8px'>Error: "+e.message+"</div>"; }
+}
+
+
+async function savePeriod() {
+  const id = document.getElementById("period-edit-id").value;
+  const body = {
+    name: document.getElementById("period-name").value.trim(),
+    start_time: document.getElementById("period-start").value||null,
+    end_time: document.getElementById("period-end").value||null,
+    session_type: document.getElementById("period-session").value
+  };
+  if(!body.name){ Toast.error("Period name required"); return; }
+  try {
+    if(id) await Api.put("/admin/periods/"+id, body);
+    else await Api.post("/admin/periods", body);
+    Toast.success("Period saved!");
+    document.getElementById("add-period-form").style.display="none";
+    document.getElementById("period-edit-id").value="";
+    delete sectionLoaded["setup"]; loadSetup();
+  } catch(e){ Toast.error(e.message); }
+}
+
+function editPeriod(id,name,start,end,session){
+  document.getElementById("period-edit-id").value=id;
+  document.getElementById("period-name").value=name;
+  document.getElementById("period-start").value=start;
+  document.getElementById("period-end").value=end;
+  document.getElementById("period-session").value=session;
+  document.getElementById("add-period-form").style.display="block";
+}
+
+async async function deletePeriod(id){
+  if(!confirm("Delete this period?")) return;
+  try {
+    await Api.delete("/admin/periods/"+id);
+    Toast.success("Period deleted");
+    delete sectionLoaded["setup"]; loadSetup();
+  } catch(e){ Toast.error(e.message); }
 }
 
 async function loadLookupStudents() {
