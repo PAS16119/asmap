@@ -394,6 +394,39 @@ def delete_class(cid):
     return jsonify({'message': 'Deleted'})
 
 
+# classes/import - bulk import from Excel
+@admin_bp.route('/classes/import', methods=['POST'])
+@admin_required
+def import_classes():
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file uploaded'}), 400
+    file = request.files['file']
+    if not file.filename.lower().endswith(('.xlsx', '.xls')):
+        return jsonify({'error': 'Only Excel files (.xlsx/.xls) accepted'}), 400
+    from openpyxl import load_workbook
+    from io import BytesIO
+    try:
+        wb = load_workbook(BytesIO(file.read()), data_only=True)
+        ws = wb.active
+    except Exception as e:
+        return jsonify({'error': f'Could not read file: {str(e)}'}), 400
+    created, skipped, errors = 0, 0, []
+    for i, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+        if not row or not row[0]:
+            continue
+        cname = str(row[0]).strip()
+        if not cname:
+            skipped += 1
+            continue
+        if Class.query.filter_by(name=cname).first():
+            skipped += 1
+            continue
+        db.session.add(Class(name=cname))
+        created += 1
+    db.session.commit()
+    return jsonify({'created': created, 'skipped': skipped, 'errors': errors})
+
+
 # â”€â”€ STUDENTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @admin_bp.route('/students', methods=['GET'])
 @jwt_required()
